@@ -3,23 +3,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# Sayfa Ayarları (Telefona Tam Uyumlu)
-st.set_page_config(page_title="Oran Analiz Pro", page_icon="⚽", layout="centered")
+# Sayfa Yapısı (Geniş Ekran - Telefonda ve PC'de Mükemmel Görünüm)
+st.set_page_config(
+    page_title="TİTAN BULDOZER — Derin Bülten Tarayıcı",
+    page_icon="⚽",
+    layout="wide",
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_PATH = os.path.join(BASE_DIR, "ORAN ANALİZ TABLOSU.xlsb")
 CACHE_PATH = os.path.join(BASE_DIR, "cache_data.pkl")
 
 
-# Streamlit Akıllı Önbellekleme (Işık Hızında Yükleme)
+# Geçmiş Veritabanını Işık Hızında Önbellekle Yükleme
 @st.cache_data(show_spinner=False)
-def load_data():
+def load_historical_data():
   if os.path.exists(CACHE_PATH):
     try:
       return pd.read_pickle(CACHE_PATH)
     except Exception:
       pass
-
   try:
     try:
       df = pd.read_excel(EXCEL_PATH, engine="pyxlsb", header=1)
@@ -38,233 +41,245 @@ def load_data():
     return None
 
 
-# Başlık
+# Başlık Tasarımı
 st.markdown(
-    "<h2 style='text-align: center; color: #00FF7F;'>⚽ ORAN ANALİZ VE PATTERN"
-    " MOTORU</h2>",
+    "<h2 style='text-align: center; color: #00FF7F;'>⚽ TİTAN BULDOZER —"
+    " DERİN BÜLTEN TARAMA MOTORU</h2>",
     unsafe_allow_html=True,
 )
 
-# Veriyi Yükle
-with st.spinner("📊 Veriler yükleniyor..."):
-  df_clean = load_data()
-
-if df_clean is None:
-  st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
-  st.stop()
-
-st.success(f"✅ **{len(df_clean):,}** analize hazır maç hafızada!")
-
-# Giriş Alanları
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-  ms1_input = st.text_input("MS 1 Oranı", value="1.58")
-with col2:
-  msx_input = st.text_input("MS X Oranı", value="3.70")
-with col3:
-  ms2_input = st.text_input("MS 2 Oranı", value="3.31")
-with col4:
-  tolerans_input = st.text_input("Tolerans (±)", value="0.03")
-
-tumunu_goster = st.checkbox(
-    "📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False
+# Güncel Bülten Yükleme Alanı (Telefondan veya Masaüstünden Dosya Atma)
+uploaded_file = st.file_uploader(
+    "📁 Güncel Bülten Dosyasını Seç (Örn: Guncel_Bulten.xlsx)",
+    type=["xlsx", "xls"],
 )
 
-btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
+df_hist = load_historical_data()
 
-if btn_analiz:
+if df_hist is None:
+  st.error(
+      "❌ Geçmiş oran analizi veritabanı (ORAN ANALİZ TABLOSU.xlsb)"
+      " bulunamadı! Lütfen dosya yolunu kontrol edin."
+  )
+  st.stop()
+
+st.success(
+    f"✅ Arşiv Hafızada: **{len(df_hist):,}** maçlık pattern veritabanı aktif ve"
+    " hazır."
+)
+
+if uploaded_file is not None:
   try:
-    ms1_v = float(ms1_input.strip().replace(",", "."))
-    msx_v = float(msx_input.strip().replace(",", "."))
-    ms2_v = float(ms2_input.strip().replace(",", "."))
-    tol_v = float(tolerans_input.strip().replace(",", "."))
-  except ValueError:
-    st.error(
-        "Lütfen tüm değerleri geçerli sayı olarak girin! (Örn: 1.85 / 0.03)"
-    )
+    df_bulten = pd.read_excel(uploaded_file)
+  except Exception as e:
+    st.error(f"Bülten okunurken hata oluştu: {e}")
     st.stop()
 
-  df_calc = df_clean.copy()
-  df_calc["Mesafe"] = np.sqrt(
-      (df_calc["MS1"] - ms1_v) ** 2
-      + (df_calc["MSX"] - msx_v) ** 2
-      + (df_calc["MS2"] - ms2_v) ** 2
+  st.info(
+      f"📂 Güncel bülten yüklendi. Toplam **{len(df_bulten)}** maç sistemde"
+      " taranmayı bekliyor."
   )
 
-  filtre = (
-      (df_calc["MS1"] >= ms1_v - tol_v)
-      & (df_calc["MS1"] <= ms1_v + tol_v)
-      & (df_calc["MSX"] >= msx_v - tol_v)
-      & (df_calc["MSX"] <= msx_v + tol_v)
-      & (df_calc["MS2"] >= ms2_v - tol_v)
-      & (df_calc["MS2"] <= ms2_v + tol_v)
-  )
-  df_tolerans = df_calc[filtre].sort_values("Mesafe").copy()
-
-  if not df_tolerans.empty:
-    toplam_bulunan = len(df_tolerans)
-    if tumunu_goster:
-      benzerler = df_tolerans.copy()
-      st.info(
-          f"🔍 ±{tol_v} tolerans aralığında **{toplam_bulunan}** maç bulundu."
-          " **Tüm maçlar listeleniyor.**"
-      )
-    else:
-      benzerler = df_tolerans.head(20).copy()
-      st.info(
-          f"🔍 ±{tol_v} tolerans aralığında **{toplam_bulunan}** maç bulundu."
-          " En yakın 20 tanesi listeleniyor."
-      )
-  else:
-    st.warning(
-        f"⚠️ ±{tol_v} tolerans aralığında maç bulunamadı. Veri setindeki en"
-        " yakın 20 maç getiriliyor..."
-    )
-    benzerler = df_calc.sort_values("Mesafe").head(20).copy()
-
-
-  def skor_ayir(s):
-    try:
-      p = str(s).strip().split("-")
-      return int(p[0]), int(p[1])
-    except:
-      return 0, 0
-
-
-  benzerler[["iy_e", "iy_d"]] = benzerler["İY SKOR"].apply(
-      lambda x: pd.Series(skor_ayir(x))
-  )
-  benzerler[["ms_e", "ms_d"]] = benzerler["MS SKOR"].apply(
-      lambda x: pd.Series(skor_ayir(x))
+  # Tolerans ayarı
+  tol_input = st.slider(
+      "Tolerans Aralığı (±)",
+      min_value=0.01,
+      max_value=0.10,
+      value=0.03,
+      step=0.01,
   )
 
-  benzerler["iy_toplam"] = benzerler["iy_e"] + benzerler["iy_d"]
-  benzerler["ms_toplam"] = benzerler["ms_e"] + benzerler["ms_d"]
-  benzerler["kg_var"] = (benzerler["ms_e"] > 0) & (benzerler["ms_d"] > 0)
+  if st.button(
+      "🚀 50 MAÇLIK DERİN BÜLTEN TARAMASINI BAŞLAT",
+      use_container_width=True,
+      type="primary",
+  ):
+    with st.spinner(
+        "⚡ Magnezyum motorlar ateşlendi, bülten taranıyor ve simülasyonlar"
+        " yapılıyor..."
+    ):
+
+      def skor_ayir(s):
+        try:
+          p = str(s).strip().split("-")
+          return int(p[0]), int(p[1])
+        except:
+          return 0, 0
+
+      # Geçmiş veriye önceden hesaplanmış skor sütunlarını ekleyelim (Hız için)
+      if "iy_toplam" not in df_hist.columns:
+        temp_iy = df_hist["İY SKOR"].apply(lambda x: pd.Series(skor_ayir(x)))
+        temp_ms = df_hist["MS SKOR"].apply(lambda x: pd.Series(skor_ayir(x)))
+        df_hist["iy_toplam"] = temp_iy[0] + temp_iy[1]
+        df_hist["ms_toplam"] = temp_ms[0] + temp_ms[1]
+        df_hist["kg_var"] = (temp_ms[0] > 0) & (temp_ms[1] > 0)
+        df_hist["is_donus"] = df_hist.apply(
+            lambda r: (
+                (temp_iy.loc[r.name, 0] > temp_iy.loc[r.name, 1])
+                and (temp_ms.loc[r.name, 0] < temp_ms.loc[r.name, 1])
+            )
+            or (
+                (temp_iy.loc[r.name, 0] < temp_iy.loc[r.name, 1])
+                and (temp_ms.loc[r.name, 0] > temp_ms.loc[r.name, 1])
+            ),
+            axis=1,
+        )
+
+      # Bülten sütunlarını esnek yakalama
+      def find_col(keywords):
+        for kw in keywords:
+          for c in df_bulten.columns:
+            if kw in str(c).upper():
+              return c
+        return None
 
 
-  def get_ht_ft(row):
-    ht = (
-        "1"
-        if row["iy_e"] > row["iy_d"]
-        else ("2" if row["iy_d"] > row["iy_e"] else "X")
-    )
-    ft = (
-        "1"
-        if row["ms_e"] > row["ms_d"]
-        else ("2" if row["ms_d"] > row["ms_e"] else "X")
-    )
-    return f"{ht}/{ft}"
+      c_saat = find_col(["SAAT", "TARİH", "TIME"])
+      c_ev = find_col(["EV", "HOME", "TAKIM1"])
+      c_dep = find_col(["DEPL", "AWAY", "TAKIM2"])
+      c_ms1 = find_col(["MS1", "MS 1", "1"])
+      c_msx = find_col(["MSX", "MS X", "X", "MS0"])
+      c_ms2 = find_col(["MS2", "MS 2", "2"])
 
+      simulasyon_sonuclari = []
 
-  benzerler["HT/FT"] = benzerler.apply(get_ht_ft, axis=1)
+      for idx, row in df_bulten.iterrows():
+        try:
+          m_saat = (
+              str(row[c_saat]) if c_saat and pd.notna(row[c_saat]) else "18:00"
+          )
+          m_ev = str(row[c_ev]) if c_ev and pd.notna(row[c_ev]) else f"Ev_{idx}"
+          m_dep = (
+              str(row[c_dep]) if c_dep and pd.notna(row[c_dep]) else f"Dep_{idx}"
+          )
+          ms1_v = float(
+              str(row[c_ms1]).replace(",", ".") if c_ms1 else row.iloc[3]
+          )
+          msx_v = float(
+              str(row[c_msx]).replace(",", ".") if c_msx else row.iloc[4]
+          )
+          ms2_v = float(
+              str(row[c_ms2]).replace(",", ".") if c_ms2 else row.iloc[5]
+          )
+        except:
+          continue
 
+        # Öklid mesafesi ile en yakın 50 maçı bulma
+        df_calc = df_hist.copy()
+        df_calc["Mesafe"] = np.sqrt(
+            (df_calc["MS1"] - ms1_v) ** 2
+            + (df_calc["MSX"] - msx_v) ** 2
+            + (df_calc["MS2"] - ms2_v) ** 2
+        )
+        benzerler = df_calc.sort_values("Mesafe").head(50)
 
-  def get_durum(row):
-    tags = []
-    ht = (
-        "1"
-        if row["iy_e"] > row["iy_d"]
-        else ("2" if row["iy_d"] > row["iy_e"] else "X")
-    )
-    ft = (
-        "1"
-        if row["ms_e"] > row["ms_d"]
-        else ("2" if row["ms_d"] > row["ms_e"] else "X")
-    )
-    if row["ms_toplam"] <= 1:
-      tags.append("KISIR")
-    elif row["ms_toplam"] >= 3:
-      tags.append("GOL")
-    if ht in ["1", "2"] and ft in ["1", "2"] and ht != ft:
-      tags.append("!!DN")
-    if row["ms_toplam"] >= 6:
-      tags.append("!!6+")
-    if row["kg_var"]:
-      tags.append("[KG]")
-    return " ".join(tags) if tags else "0-0"
+        if len(benzerler) > 0:
+          oran_str = f"{ms1_v:.2f}-{msx_v:.2f}-{ms2_v:.2f}"
+          mac_adi_str = f"{m_ev} - {m_dep}"[:22]
 
+          donus_pct = round((benzerler["is_donus"].sum() / len(benzerler)) * 100)
+          gol6_pct = round(
+              ((benzerler["ms_toplam"] >= 6).sum() / len(benzerler)) * 100
+          )
+          ust45_pct = round(
+              ((benzerler["ms_toplam"] >= 5).sum() / len(benzerler)) * 100
+          )
+          ust25_pct = round(
+              ((benzerler["ms_toplam"] >= 3).sum() / len(benzerler)) * 100
+          )
+          kg_pct = round((benzerler["kg_var"].sum() / len(benzerler)) * 100)
 
-  benzerler["DURUM"] = benzerler.apply(get_durum, axis=1)
+          simulasyon_sonuclari.append({
+              "saat": m_saat[:11],
+              "mac": mac_adi_str,
+              "oranlar": oran_str,
+              "donus": donus_pct,
+              "gol6": gol6_pct,
+              "ust45": ust45_pct,
+              "ust25": ust25_pct,
+              "kg": kg_pct,
+          })
 
-  iy_05 = round((benzerler["iy_toplam"] >= 1).mean() * 100)
-  iy_15 = round((benzerler["iy_toplam"] >= 2).mean() * 100)
-  ms_25 = round((benzerler["ms_toplam"] >= 3).mean() * 100)
-  ms_35 = round((benzerler["ms_toplam"] >= 4).mean() * 100)
-  kg_v = round(benzerler["kg_var"].mean() * 100)
+      df_res = pd.DataFrame(simulasyon_sonuclari)
 
-  st.subheader("🎯 İstatistik Yüzdeleri")
-  m1, m2, m3, m4, m5 = st.columns(5)
-  m1.metric("İY 0.5+", f"%{iy_05}")
-  m2.metric("İY 1.5+", f"%{iy_15}")
-  m3.metric("MS 2.5+", f"%{ms_25}")
-  m4.metric("MS 3.5+", f"%{ms_35}")
-  m5.metric("KG VAR", f"%{kg_v}")
+      if not df_res.empty:
+        grup1 = df_res.sort_values(by="donus", ascending=False).head(15)
+        grup3 = df_res.sort_values(by="gol6", ascending=False).head(15)
+        grup5 = df_res.sort_values(by="ust25", ascending=False).head(10)
 
-  st.markdown("---")
-  st.subheader("📊 En Olası Skorlar")
-  skor_counts = benzerler["MS SKOR"].value_counts()
-  for skor, count in skor_counts.head(5).items():
-    pct = (count / len(benzerler)) * 100
-    st.write(f"• **{skor}** — %{pct:.1f}")
+        # Terminal Görünümü İçin Satırları Oluşturma
+        terminal_lines = []
 
-  st.markdown("---")
-  st.subheader("📋 Benzer Maçlar")
+        # Grup 1 Başlık ve Maçları
+        terminal_lines.append(
+            "<span style='color:#FF8C00; font-weight:bold;'>⚡ GRUP 1: 1/2 VE"
+            " 2/1 SÜRPRİZ DÖNÜŞ BOMBALARI</span>"
+        )
+        terminal_lines.append(
+            "<span style='color:#00FF66;'>" + "-" * 75 + "</span>"
+        )
+        for _, r in grup1.iterrows():
+          line = f"{r['saat']:<11} | {r['mac']:<22} | {r['oranlar']:<15} | 🎴 1/2-2/1: %{r['donus']} ({int(r['donus']*50/100)}/50)"
+          terminal_lines.append(f"<span style='color:#00FF66;'>{line}</span>")
 
-  lines = []
-  header_line = f"{'SEZON/LİG':<12} | {'MAÇ':<20} | {'İY':<4} | {'MS':<4} | {'HT/FT':<7} | {'DURUM'}"
-  sep_line = "-" * 67
+        terminal_lines.append("")
+        # Grup 3 Başlık ve Maçları
+        terminal_lines.append(
+            "<span style='color:#FF8C00; font-weight:bold;'>🔥 GRUP 3: 6+ GOL"
+            " YAĞMURU SİNYALLERİ</span>"
+        )
+        terminal_lines.append(
+            "<span style='color:#00FF66;'>" + "-" * 75 + "</span>"
+        )
+        for _, r in grup3.iterrows():
+          line = f"{r['saat']:<11} | {r['mac']:<22} | {r['oranlar']:<15} | ⚽ 6+ Gol: %{r['gol6']} | ⚽ 4.5+ Üst: %{r['ust45']}"
+          terminal_lines.append(f"<span style='color:#00E5FF;'>{line}</span>")
 
-  lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
-  lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
+        terminal_lines.append("")
+        # Grup 5 Başlık ve Maçları
+        terminal_lines.append(
+            "<span style='color:#FF8C00; font-weight:bold;'>🎯 GRUP 5: 2.5+"
+            " ÜST & KG VAR YÜKSEK İHTİMAL MAÇLAR</span>"
+        )
+        terminal_lines.append(
+            "<span style='color:#00FF66;'>" + "-" * 75 + "</span>"
+        )
+        for _, r in grup5.iterrows():
+          line = f"{r['saat']:<11} | {r['mac']:<22} | {r['oranlar']:<15} | ⚽ 2.5+ Üst: %{r['ust25']} | 💖 KG Var: %{r['kg']}"
+          terminal_lines.append(f"<span style='color:#00FF66;'>{line}</span>")
 
-  for _, row in benzerler.iterrows():
-    tarih = str(row.get("SEZON", ""))[:11]
-    ev = str(row.get("EV SAHİBİ", ""))[:9]
-    dep = str(row.get("DEPLASMAN", ""))[:9]
-    mac_adi = f"{ev}-{dep}"
-    iy_s = str(row.get("İY SKOR", ""))
-    ms_s = str(row.get("MS SKOR", ""))
-    ht_ft = str(row.get("HT/FT", ""))
-    durum = str(row.get("DURUM", ""))
+        content_html = "<br>".join(terminal_lines)
 
-    is_donus = ht_ft in ["1/2", "2/1"]
-    is_6plus = row["ms_toplam"] >= 6
+        # Siyah Terminal Kutusu Tasarımı
+        terminal_box = []
+        terminal_box.append("""
+                <div style="
+                    background-color: #000000;
+                    padding: 15px;
+                    border-radius: 8px;
+                    font-family: 'Courier New', Consolas, monospace;
+                    font-size: 13px;
+                    line-height: 1.5;
+                    white-space: pre;
+                    overflow-x: auto;
+                    border: 1px solid #222;
+                ">
+                """)
+        terminal_box.append(content_html)
+        terminal_box.append("</div>")
 
-    if is_6plus:
-      ht_ft_disp = f"{ht_ft} 🔥" if is_donus else ht_ft
-      durum_disp = f"{durum} 🔥" if "🔥" not in durum else durum
-      line_str = f"{tarih:<12} | {mac_adi:<20} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7} | {durum_disp}"
-      lines.append(
-          f"<span style='color:#00E5FF; font-weight:bold;'>{line_str}</span>"
-      )
-    elif is_donus:
-      ht_ft_disp = f"{ht_ft} 🔥"
-      line_str = f"{tarih:<12} | {mac_adi:<20} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disk if 'ht_ft_disk' in locals() else ht_ft_disp:<7} | {durum}"  # safe fallback
-      lines.append(
-          f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>"
-      )
-    else:
-      line_str = f"{tarih:<12} | {mac_adi:<20} | {iy_s:<4} | {ms_s:<4} | {ht_ft:<7} | {durum}"
-      lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
-
-  content_html = "<br>".join(lines)
-
-  terminal_box = f"""
-    <div style="
-        background-color: #000000;
-        padding: 15px;
-        border-radius: 8px;
-        font-family: 'Courier New', Consolas, monospace;
-        font-size: 13px;
-        line-height: 1.5;
-        white-space: pre;
-        overflow-x: auto;
-        word-break: keep-all;
-        word-wrap: normal;
-        border: 1px solid #222;
-    ">
-{content_html}
-    </div>
-    """
-  st.markdown(terminal_box, unsafe_allow_html=True)
+        st.markdown("".join(terminal_box), unsafe_allow_html=True)
+        st.success(
+            f"⚡ {len(df_res)} Maçlık Derin AI Bülten Taraması Başarıyla"
+            " Tamamlandı!"
+        )
+      else:
+        st.warning(
+            "⚠️ Bülten içerisindeki oran sütunları eşleştirilemedi. Lütfen"
+            " bülten formatını kontrol edin."
+        )
+else:
+  st.info(
+      "💡 Cebinden dilediğin gibi tarama yapmak için yukarıdan güncel bülten"
+      " Excel dosyanı yükle kanka."
+  )
