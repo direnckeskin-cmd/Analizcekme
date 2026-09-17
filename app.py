@@ -20,6 +20,23 @@ def takim_ismini_bul(row, index, is_home=True):
             
     return f"Ev_{index}" if is_home else f"Dep_{index}"
 
+# --- 2. DOSYA OKUMA FONKSİYONU (XLSB / XLSX / CSV DESTEKLİ) ---
+def dosya_oku(uploaded_file, default_name):
+    if uploaded_file is not None:
+        name = uploaded_file.name.lower()
+        if name.endswith('.xlsb'):
+            return pd.read_excel(uploaded_file, engine='pyxlsb')
+        elif name.endswith('.xlsx') or name.endswith('.xls'):
+            return pd.read_excel(uploaded_file)
+        else:
+            return pd.read_csv(uploaded_file)
+    elif os.path.exists(default_name):
+        if default_name.endswith('.xlsb'):
+            return pd.read_excel(default_name, engine='pyxlsb')
+        else:
+            return pd.read_excel(default_name)
+    return None
+
 
 # --- STREAMLIT ARAYÜZÜ ---
 st.title("🎯 Derin AI Bülten Analiz & Oran Taraması")
@@ -27,35 +44,24 @@ st.title("🎯 Derin AI Bülten Analiz & Oran Taraması")
 # Tolerans Slider'ı
 tolerans = st.slider("Tolerans Aralığı (±)", min_value=0.01, max_value=0.10, value=0.03, step=0.01)
 
-# Dosya Yükleyiciler (Klasörde hazır varsa otomatik de okur)
+# Dosya Yükleyiciler (.xlsb desteği eklendi)
 col1, col2 = st.columns(2)
 with col1:
-    bulten_file = st.file_uploader("📋 Bülten Dosyası (Excel/CSV)", type=["xlsx", "csv"])
+    bulten_file = st.file_uploader("📋 Bülten Dosyası (Excel/CSV/XLSB)", type=["xlsx", "csv", "xlsb"])
 with col2:
-    gecmis_file = st.file_uploader("📚 Geçmiş Veri Dosyası (Excel/CSV)", type=["xlsx", "csv"])
+    gecmis_file = st.file_uploader("📚 Geçmiş Veri Dosyası (Excel/CSV/XLSB)", type=["xlsx", "csv", "xlsb"])
 
 # Taramayı Başlat Butonu
-baslat_butonu = st.button(f"🚀 DERİN BÜLTEN TARAMASINI BAŞLAT", use_container_width=True, type="primary")
+baslat_butonu = st.button("🚀 DERİN BÜLTEN TARAMASINI BAŞLAT", use_container_width=True, type="primary")
 
 if baslat_butonu:
-    # 1. Veri Yükleme Kontrolü
-    bulten_df, gecmis_df = None, None
-
-    # Kullanıcı dosya yüklediyse onu al, yoksa klasördeki varsayılan dosyaları ara
-    if bulten_file:
-        bulten_df = pd.read_excel(bulten_file) if bulten_file.name.endswith('.xlsx') else pd.read_csv(bulten_file)
-    elif os.path.exists("bulten.xlsx"):
-        bulten_df = pd.read_excel("bulten.xlsx")
-
-    if gecmis_file:
-        gecmis_df = pd.read_excel(gecmis_file) if gecmis_file.name.endswith('.xlsx') else pd.read_csv(gecmis_file)
-    elif os.path.exists("gecmis.xlsx"):
-        gecmis_df = pd.read_excel("gecmis.xlsx")
+    bulten_df = dosya_oku(bulten_file, "bulten.xlsx")
+    gecmis_df = dosya_oku(gecmis_file, "gecmis.xlsx")
 
     if bulten_df is None or gecmis_df is None:
-        st.error("❌ Lütfen Bülten ve Geçmiş Veri dosyalarını yükleyin veya GitHub ana dizinine 'bulten.xlsx' ve 'gecmis.xlsx' olarak ekleyin!")
+        st.error("❌ Lütfen Bülten ve Geçmiş Veri dosyalarını yükleyin!")
     else:
-        # 2. Hızlı Vektörel Tarama Motoru
+        # Hızlı Vektörel Tarama Motoru
         start_time = time.time()
         
         oran_sutunlari = []
@@ -77,7 +83,7 @@ if baslat_butonu:
                 b_row = bulten_df.iloc[i]
                 b_oran = bulten_oranlar[i]
 
-                # Vektörel Hızlı Hesaplama
+                # NumPy Hızlı Vektörel Çıkarma
                 farklar = np.abs(gecmis_oranlar - b_oran)
                 eslesen_maske = np.all(farklar <= tolerans, axis=1)
                 eslesen_maclar = gecmis_df[eslesen_maske]
@@ -117,7 +123,7 @@ if baslat_butonu:
 
             gecen_sure = round(time.time() - start_time, 2)
 
-            # --- EKRANA BASMA (STREAMLIT YAZDIRMA) ---
+            # --- EKRANA BASMA ---
             st.subheader("⚡ GRUP 1: 1/2 VE 2/1 SÜRPRİZ DÖNÜŞ BOMBALARI")
             if grup1:
                 st.code("\n".join(grup1), language="text")
