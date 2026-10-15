@@ -143,7 +143,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # ÜST İSTATİSTİKLER (ALT ALTA DÜZEN)
+    # ÜST İSTATİSTİKLER (ALT ALTA)
     istatistik_lines = [
         f"🟢 İY 0.5+ : %{iy_05:<2}  [60-90]",
         f"🟢 İY 1.5+ : %{iy_15:<2}  [15-45]",
@@ -162,36 +162,47 @@ if 'benzerler' in locals() and not benzerler.empty:
     # Maç Tablosu
     st.markdown("---")
     lines = []
-    header_line = f"{'TARİH':<10} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
-    sep_line = "-" * 72
+    header_line = f"{'SEZON/TARİH':<12} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
+    sep_line = "-" * 74
 
     lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
     lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        tarih_val = str(row.get('SEZON', ''))
-        tarih = tarih_val[:10] if len(tarih_val) >= 10 else f"{tarih_val:<10}"[:10]
-        
+        # Tarih / Sezon sütununu tam genişlikte alıyoruz
+        tarih = str(row.get('SEZON', ''))[:12].ljust(12)
         ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
         dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
         iy_s = str(row.get('İY SKOR', ''))
         ms_s = str(row.get('MS SKOR', ''))
         ht_ft = str(row.get('HT/FT', ''))
+        ms_toplam = row['ms_toplam']
 
         is_donus = ht_ft in ['1/2', '2/1']
+        is_6plus = ms_toplam >= 6
+        is_1x = ht_ft == '1/X'
+        is_2x = ht_ft == '2/X'
+
         if is_donus:
             donus_sayisi += 1
             ht_ft_disp = f"{ht_ft} 🔥"
         else:
             ht_ft_disp = ht_ft
 
-        line_str = f"{tarih:<10} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
+        line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
         
-        if is_donus:
-            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
+        # Renk Atamaları (İstediğin Renk Paleti)
+        if is_6plus:
+            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>") # Kırmızı (6+ Gol)
+        elif is_donus:
+            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>") # Turuncu (1/2 - 2/1)
+        elif is_1x:
+            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>") # Sarı (1/X)
+        elif is_2x:
+            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>") # Mavi (2/X)
         else:
-            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
+            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>") # Standart Yeşil
 
     terminal_box = f"""
     <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
@@ -224,9 +235,8 @@ if 'benzerler' in locals() and not benzerler.empty:
             ms_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
         st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(ms_trend_lines)}</div>", unsafe_allow_html=True)
 
-    # DÜZELTİLMİŞ AKILLI RİSK BANDI (Hassasiyet Artırıldı: %8 üstü veya 2+ dönüş varsa uyarır)
+    # Risk Bandı
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
-    
     if donus_orani >= 8 or donus_sayisi >= 2:
         uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/X) Potansiyeli Taşıyor!"
         st.markdown(f"""
