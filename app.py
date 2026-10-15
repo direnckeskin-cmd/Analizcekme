@@ -1,162 +1,256 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import time
+import numpy as np
 import os
 
-st.set_page_config(page_title="Derin Bülten Taraması", layout="wide")
+# Sayfa Ayarları (Telefona Tam Uyumlu)
+st.set_page_config(page_title="Oran Analiz Pro", page_icon="⚽", layout="centered")
 
-# --- ORANLARI GÜVENLİ SAYIYA ÇEVİRME (VİRGÜL SAVAR) ---
-def oranlari_temizle(df, sutunlar):
-    for col in sutunlar:
-        df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
-    return df
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_PATH = os.path.join(BASE_DIR, "ORAN ANALİZ TABLOSU.xlsb")
+CACHE_PATH = os.path.join(BASE_DIR, "cache_data.pkl")
 
-# --- SÜTUN İSİMLERİNİ ESNEK YAKALAMA ---
-def oran_sutunlarini_bul(df):
-    sutun_haritası = {str(c).strip().upper(): c for c in df.columns}
-    adaylar = [
-        ['MS1', 'MSX', 'MS2'],
-        ['MS_1', 'MS_X', 'MS_2'],
-        ['1', 'X', '2'],
-        ['MS 1', 'MS X', 'MS 2']
-    ]
-    for aday in adaylar:
-        if all(c in sutun_haritası for c in aday):
-            return [sutun_haritası[c] for c in aday]
-    return None
-
-def takim_ismini_bul(row, index, is_home=True):
-    olasi_sutunlar = (
-        ['EV_TAKIM', 'EV_TAKIM ', 'Ev_Takim', 'Ev Sahibi', 'Home', 'Ev', 'EV', 'Takim_1']
-        if is_home else
-        ['DEP_TAKIM', 'DEP_TAKIM ', 'Dep_Takim', 'Deplasman', 'Away', 'Dep', 'DEP', 'Takim_2']
-    )
-    for sutun in olasi_sutunlar:
-        if sutun in row and pd.notna(row[sutun]) and str(row[sutun]).strip() != '':
-            return str(row[sutun]).strip()
-    return f"Ev_{index}" if is_home else f"Dep_{index}"
-
-def dosya_oku(uploaded_file, default_name):
-    if uploaded_file is not None:
-        name = uploaded_file.name.lower()
-        if name.endswith('.xlsb'):
-            return pd.read_excel(uploaded_file, engine='pyxlsb')
-        elif name.endswith(('.xlsx', '.xls')):
-            return pd.read_excel(uploaded_file)
-        else:
-            return pd.read_csv(uploaded_file)
-    elif os.path.exists(default_name):
-        return pd.read_excel(default_name)
-    return None
-
-# --- STREAMLIT ARAYÜZÜ ---
-st.title("🎯 Derin AI Bülten Analiz & Oran Taraması")
-
-tolerans = st.slider("Tolerans Aralığı (±)", min_value=0.01, max_value=0.10, value=0.03, step=0.01)
-
-col1, col2 = st.columns(2)
-with col1:
-    bulten_file = st.file_uploader("📋 Bülten Dosyası (Excel/CSV/XLSB)", type=["xlsx", "csv", "xlsb"])
-with col2:
-    gecmis_file = st.file_uploader("📚 Geçmiş Veri Dosyası (Excel/CSV/XLSB)", type=["xlsx", "csv", "xlsb"])
-
-baslat_butonu = st.button("🚀 DERİN BÜLTEN TARAMASINI BAŞLAT", use_container_width=True, type="primary")
-
-if baslat_butonu:
+# Streamlit Akıllı Önbellekleme (Işık Hızında Yükleme)
+@st.cache_data(show_spinner=False)
+def load_data():
+    if os.path.exists(CACHE_PATH):
+        try:
+            return pd.read_pickle(CACHE_PATH)
+        except Exception:
+            pass
+    
     try:
-        with st.spinner("⏳ 16.7 MB'lık geçmiş veri dosyası okunuyor ve matrisler hazırlanıyor... Lütfen bekleyin..."):
-            bulten_df = dosya_oku(bulten_file, "bulten.xlsx")
-            gecmis_df = dosya_oku(gecmis_file, "gecmis.xlsx")
+        try:
+            df = pd.read_excel(EXCEL_PATH, engine='pyxlsb', header=1)
+        except Exception:
+            df = pd.read_excel(EXCEL_PATH, header=1)
 
-        if bulten_df is None or gecmis_df is None:
-            st.error("❌ Lütfen her iki dosyayı da yükleyin!")
-        else:
-            with st.spinner("⚡ Vektörel oran taraması yapılıyor..."):
-                start_time = time.time()
-                
-                bulten_oran_cols = oran_sutunlarini_bul(bulten_df)
-                gecmis_oran_cols = oran_sutunlarini_bul(gecmis_df)
-
-                if not bulten_oran_cols or not gecmis_oran_cols:
-                    st.error("❌ Oran sütunları (MS1, MSX, MS2) dosyalardan birinde tespit edilemedi!")
-                else:
-                    # Virgüllü oranları noktaya çevirip sayı yap
-                    bulten_df = oranlari_temizle(bulten_df, bulten_oran_cols)
-                    gecmis_df = oranlari_temizle(gecmis_df, gecmis_oran_cols)
-
-                    bulten_oranlar = bulten_df[bulten_oran_cols].to_numpy(dtype=float)
-                    gecmis_oranlar = gecmis_df[gecmis_oran_cols].to_numpy(dtype=float)
-
-                    grup1, grup3, grup5 = [], [], []
-                    toplam_bulten = len(bulten_df)
-
-                    for i in range(toplam_bulten):
-                        b_row = bulten_df.iloc[i]
-                        b_oran = bulten_oranlar[i]
-
-                        # NaN oran varsa atla
-                        if np.isnan(b_oran).any():
-                            continue
-
-                        farklar = np.abs(gecmis_oranlar - b_oran)
-                        eslesen_maske = np.all(farklar <= tolerans, axis=1)
-                        eslesen_maclar = gecmis_df[eslesen_maske]
-
-                        toplam_eslesme = len(eslesen_maclar)
-                        if toplam_eslesme < 5:
-                            continue
-
-                        ev_adi = takim_ismini_bul(b_row, i, is_home=True)
-                        dep_adi = takim_ismini_bul(b_row, i, is_home=False)
-                        tarih = str(b_row.get('Tarih', b_row.get('TARİH', '20.09.2026')))
-
-                        # İstatistikler
-                        iy_ms_col = [c for c in eslesen_maclar.columns if str(c).strip().upper() in ['IY_MS', 'İY_MS', 'IY/MS']]
-                        if iy_ms_col:
-                            donus_sayisi = eslesen_maclar[iy_ms_col[0]].isin(['1/2', '2/1']).sum()
-                            donus_yuzde = int(round((donus_sayisi / toplam_eslesme) * 100))
-                        else:
-                            donus_yuzde, donus_sayisi = 0, 0
-
-                        gol_col = [c for c in eslesen_maclar.columns if str(c).strip().upper() in ['TOPLAM_GOL', 'TG', 'GOL']]
-                        if gol_col:
-                            toplam_gol = pd.to_numeric(eslesen_maclar[gol_col[0]], errors='coerce')
-                            gol_6_yuzde = int(round(((toplam_gol >= 6).sum() / toplam_eslesme) * 100))
-                            ust_45_yuzde = int(round(((toplam_gol > 4.5).sum() / toplam_eslesme) * 100))
-                            ust_25_yuzde = int(round(((toplam_gol > 2.5).sum() / toplam_eslesme) * 100))
-                        else:
-                            gol_6_yuzde, ust_45_yuzde, ust_25_yuzde = 0, 0, 0
-
-                        kg_col = [c for c in eslesen_maclar.columns if str(c).strip().upper() in ['KG', 'KG_DURUM', 'KG_VAR']]
-                        if kg_col:
-                            kg_var = eslesen_maclar[kg_col[0]].astype(str).str.upper()
-                            kg_var_yuzde = int(round(((kg_var == 'KG VAR').sum() / toplam_eslesme) * 100))
-                        else:
-                            kg_var_yuzde = 0
-
-                        oran_str = f"{b_oran[0]:.2f}-{b_oran[1]:.2f}-{b_oran[2]:.2f}"
-                        mac_etiketi = f"{tarih} | {ev_adi:<15} - {dep_adi:<15} | {oran_str}"
-
-                        if donus_yuzde >= 14:
-                            grup1.append(f"{mac_etiketi} | 🚨 1/2-2/1: %{donus_yuzde} ({donus_sayisi}/{toplam_eslesme})")
-                        if gol_6_yuzde >= 20:
-                            grup3.append(f"{mac_etiketi} | ⚽ 6+ Gol: %{gol_6_yuzde} | ⚽ 4.5+ Üst: %{ust_45_yuzde}")
-                        if ust_25_yuzde >= 80:
-                            grup5.append(f"{mac_etiketi} | ⚽ 2.5+ Üst: %{ust_25_yuzde} | 💖 KG Var: %{kg_var_yuzde}")
-
-                    gecen_sure = round(time.time() - start_time, 2)
-
-                    st.subheader("⚡ GRUP 1: 1/2 VE 2/1 SÜRPRİZ DÖNÜŞ BOMBALARI")
-                    st.code("\n".join(grup1) if grup1 else "Bu kriterde maç bulunamadı.", language="text")
-
-                    st.subheader("🔥 GRUP 3: 6+ GOL YAĞMURU SİNYALLERİ")
-                    st.code("\n".join(grup3) if grup3 else "Bu kriterde maç bulunamadı.", language="text")
-
-                    st.subheader("🎯 GRUP 5: 2.5+ ÜST & KG VAR YÜKSEK İHTİMAL MAÇLAR")
-                    st.code("\n".join(grup5) if grup5 else "Bu kriterde maç bulunamadı.", language="text")
-
-                    st.success(f"⚡ {toplam_bulten} Maçlık Derin AI Bülten Taraması {gecen_sure} Saniyede Başarıyla Tamamlandı!")
-
+        df['MS1'] = pd.to_numeric(df['MS1'], errors='coerce')
+        df['MSX'] = pd.to_numeric(df['MSX'], errors='coerce')
+        df['MS2'] = pd.to_numeric(df['MS2'], errors='coerce')
+        df_clean = df.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
+        df_clean.to_pickle(CACHE_PATH)
+        return df_clean
     except Exception as e:
-        st.error(f"❌ İşlem sırasında bir hata oluştu: {str(e)}")
+        return None
+
+# Başlık
+st.markdown("<h2 style='text-align: center; color: #00FF7F;'>⚽ ORAN ANALİZ VE PATTERN MOTORU</h2>", unsafe_allow_html=True)
+
+# Veriyi Yükle
+with st.spinner("📊 Veriler yükleniyor..."):
+    df_clean = load_data()
+
+if df_clean is None:
+    st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
+    st.stop()
+
+st.success(f"✅ Toplam {len(df_clean):,} maç hafızada!")
+
+# ==========================================
+# 🏆 LİG SEÇİM / FİLTRELEME MODÜLÜ
+# ==========================================
+lig_kolonu = None
+for col in ['ÜLKE / LİG', 'ÜLKE/LİG', 'LİG', 'LIG', 'Lig', 'Lig Adı']:
+    if col in df_clean.columns:
+        lig_kolonu = col
+        break
+
+if lig_kolonu:
+    df_clean[lig_kolonu] = df_clean[lig_kolonu].astype(str).str.strip()
+    tum_ligler = sorted(df_clean[lig_kolonu].dropna().unique().tolist())
+    
+    st.markdown("### 🏆 Lig Filtreleme")
+    secilen_ligler = st.multiselect(
+        "Analize dahil etmek istediğin ligleri seç (Boş bırakırsan hepsi taranır):",
+        options=tum_ligler,
+        default=tum_ligler
+    )
+    
+    if secilen_ligler:
+        df_clean = df_clean[df_clean[lig_kolonu].isin(secilen_ligler)]
+        st.info(f"🎯 Filtreleme aktif: Seçilen liglerde toplam **{len(df_clean):,}** maç analize hazır.")
+else:
+    st.warning("⚠️ Excel dosyasında lig sütunu bulunamadı, tüm veriler üzerinden analiz yapılıyor.")
+
+st.markdown("---")
+
+# Giriş Alanları
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    ms1_input = st.text_input("MS 1 Oranı", value="1.58")
+with col2:
+    msx_input = st.text_input("MS X Oranı", value="3.70")
+with col3:
+    ms2_input = st.text_input("MS 2 Oranı", value="3.31")
+with col4:
+    tolerans_input = st.text_input("Tolerans (±)", value="0.03")
+
+tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
+btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
+
+if btn_analiz:
+    try:
+        ms1_v = float(ms1_input.strip().replace(',', '.'))
+        msx_v = float(msx_input.strip().replace(',', '.'))
+        ms2_v = float(ms2_input.strip().replace(',', '.'))
+        tol_v = float(tolerans_input.strip().replace(',', '.'))
+    except ValueError:
+        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Örn: 1.85 / 0.03)")
+        st.stop()
+
+    # 1. Aşama: Mesafe Hesaplama
+    df_calc = df_clean.copy()
+    df_calc['Mesafe'] = np.sqrt(
+        (df_calc['MS1'] - ms1_v)**2 + 
+        (df_calc['MSX'] - msx_v)**2 + 
+        (df_calc['MS2'] - ms2_v)**2
+    )
+
+    # 2. Aşama: Tolerans Filtrelemesi
+    filtre = (
+        (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v) &
+        (df_calc['MSX'] >= msx_v - tol_v) & (df_calc['MSX'] <= msx_v + tol_v) &
+        (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
+    )
+    df_tolerans = df_calc[filtre].sort_values('Mesafe').copy()
+
+    # 3. Aşama: Sonuç Belirleme
+    if not df_tolerans.empty:
+        toplam_bulunan = len(df_tolerans)
+        if tumunu_goster:
+            benzerler = df_tolerans.copy()
+            st.info(f"🔍 ±{tol_v} tolerans aralığında {toplam_bulunan} maç bulundu. Tüm maçlar listeleniyor.")
+        else:
+            benzerler = df_tolerans.head(20).copy()
+            st.info(f"🔍 ±{tol_v} tolerans aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
+    else:
+        st.warning(f"⚠️ ±{tol_v} tolerans aralığında maç bulunamadı. Veri setindeki en yakın 20 maç getiriliyor...")
+        benzerler = df_calc.sort_values('Mesafe').head(20).copy()
+
+def skor_ayir(s):
+    try:
+        p = str(s).strip().split('-')
+        return int(p[0]), int(p[1])
+    except:
+        return 0, 0
+
+if 'benzerler' in locals():
+    benzerler[['iy_e', 'iy_d']] = benzerler['İY SKOR'].apply(lambda x: pd.Series(skor_ayir(x)))
+    benzerler[['ms_e', 'ms_d']] = benzerler['MS SKOR'].apply(lambda x: pd.Series(skor_ayir(x)))
+
+    benzerler['iy_toplam'] = benzerler['iy_e'] + benzerler['iy_d']
+    benzerler['ms_toplam'] = benzerler['ms_e'] + benzerler['ms_d']
+    benzerler['kg_var'] = (benzerler['ms_e'] > 0) & (benzerler['ms_d'] > 0)
+
+    def get_ht_ft(row):
+        ht = '1' if row['iy_e'] > row['iy_d'] else ('2' if row['iy_d'] > row['iy_e'] else 'X')
+        ft = '1' if row['ms_e'] > row['ms_d'] else ('2' if row['ms_d'] > row['ms_e'] else 'X')
+        return f"{ht}/{ft}"
+
+    benzerler['HT/FT'] = benzerler.apply(get_ht_ft, axis=1)
+
+    # İstatistikler ve Aralık Tahminleri (X Formatı Benzeri)
+    toplam_mac = len(benzerler)
+    iy_05 = round((benzerler['iy_toplam'] >= 1).mean() * 100)
+    iy_15 = round((benzerler['iy_toplam'] >= 2).mean() * 100)
+    ms_25 = round((benzerler['ms_toplam'] >= 3).mean() * 100)
+    ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
+    kg_v = round(benzerler['kg_var'].mean() * 100)
+
+    # X Biçimli Üst İstatistik Alanı (Terminal Tarzı)
+    istatistik_text = f"""
+    🟢 İY 0.5+ : % {iy_05:<3}  [60-90]
+    🟢 İY 1.5+ : % {iy_15:<3}  [15-45]
+    🟢 MS 2.5+ : % {ms_25:<3}  [20-50]
+    🟢 MS 3.5+ : % {ms_35:<3}  [5-35]
+    🏆 KG VAR  : % {kg_v:<3}  [50-80]
+    """
+    st.markdown(f"""
+    <div style="background-color: #000000; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; color: #00FF66; border: 1px solid #222;">
+    <pre style="margin:0; background:none; color:#00FF66;">{istatistik_text}</pre>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Maç Tablosu (Ayrı Ev Sahibi ve Deplasman Sütunlarıyla)
+    st.markdown("---")
+    lines = []
+    header_line = f"{'TARİH':<10} | {'EV SAHİBİ':<18} | {'DEPLASMAN':<18} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
+    sep_line = "-" * 75
+
+    lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
+    lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
+
+    donus_sayisi = 0
+    for _, row in benzerler.iterrows():
+        tarih = str(row.get('SEZON', ''))[:10]
+        ev = str(row.get('EV SAHİBİ', ''))[:16]
+        dep = str(row.get('DEPLASMAN', ''))[:16]
+        iy_s = str(row.get('İY SKOR', ''))
+        ms_s = str(row.get('MS SKOR', ''))
+        ht_ft = str(row.get('HT/FT', ''))
+
+        is_donus = ht_ft in ['1/2', '2/1']
+        if is_donus:
+            donus_sayisi += 1
+            ht_ft_disp = f"{ht_ft} 🔥"
+        else:
+            ht_ft_disp = ht_ft
+
+        line_str = f"{tarih:<10} | {ev:<18} | {dep:<18} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
+        
+        if is_donus:
+            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
+        else:
+            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
+
+    terminal_box = f"""
+    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
+    {"<br>".join(lines)}
+    </div>
+    """
+    st.markdown(terminal_box, unsafe_allow_html=True)
+
+    # Alt Kısım: Skor Trendleri (X Formatındaki Gibi İY ve MS Ayrı Ayrı)
+    st.markdown("---")
+    st.subheader("📊 Skor Trendleri")
+
+    col_t1, col_t2 = st.columns(2)
+
+    with col_t1:
+        st.markdown("##### ⚽ İY SKOR TRENDİ")
+        iy_counts = benzerler['İY SKOR'].value_counts().head(6)
+        iy_trend_lines = []
+        for skor, count in iy_counts.items():
+            pct = (count / toplam_mac) * 100
+            iy_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
+        st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(iy_trend_lines)}</div>", unsafe_allow_html=True)
+
+    with col_t2:
+        st.markdown("##### ⚽ MS SKOR TRENDİ (İLK 8)")
+        ms_counts = benzerler['MS SKOR'].value_counts().head(8)
+        ms_trend_lines = []
+        for skor, count in ms_counts.items():
+            pct = (count / toplam_mac) * 100
+            ms_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
+        st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(ms_trend_lines)}</div>", unsafe_allow_html=True)
+
+    # Akıllı Risk / Ters Köşe Uyarı Bandı
+    donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
+    if donus_orani >= 15:
+        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında Maç İçi Ters Köşe (1/2 veya 2/X) Potansiyeli Taşıyor!"
+        st.markdown(f"""
+        <div style="background-color: #8B0000; color: #FFFFFF; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
+        {uyari_mesaji}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div style="background-color: #004d1a; color: #00FF66; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
+        ✅ Oran Havuzu İstikrarlı Seyrediyor (Ters köşe riski düşük).
+        </div>
+        """, unsafe_allow_html=True)
+
+else:
+    if btn_analiz:
+        st.warning("Lütfen analiz için geçerli oranlar girin.")
