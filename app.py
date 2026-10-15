@@ -95,7 +95,6 @@ if btn_analiz:
         (df_calc['MS2'] - ms2_v)**2
     )
 
-    # Tolerans Filtresi
     filtre = (
         (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v) &
         (df_calc['MSX'] >= msx_v - tol_v) & (df_calc['MSX'] <= msx_v + tol_v) &
@@ -144,34 +143,37 @@ if 'benzerler' in locals() and not benzerler.empty:
     ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # Üst İstatistik Alanı
+    # X Biçimli Üst İstatistik Alanı
     istatistik_text = f"""
-    🟢 İY 0.5+ : % {iy_05:<3}  [60-90]
-    🟢 İY 1.5+ : % {iy_15:<3}  [15-45]
-    🟢 MS 2.5+ : % {ms_25:<3}  [20-50]
-    🟢 MS 3.5+ : % {ms_35:<3}  [5-35]
-    🏆 KG VAR  : % {kg_v:<3}  [50-80]
+    🟢 İY 0.5+ : % {iy_05:<2}  [60-90]
+    🟢 İY 1.5+ : % {iy_15:<2}  [15-45]
+    🟢 MS 2.5+ : % {ms_25:<2}  [20-50]
+    🟢 MS 3.5+ : % {ms_35:<2}  [5-35]
+    🏆 KG VAR  : % {kg_v:<2}  [50-80]
     """
     st.markdown(f"""
-    <div style="background-color: #000000; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; color: #00FF66; border: 1px solid #222; overflow-x: auto;">
+    <div style="background-color: #000000; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #00FF66; border: 1px solid #222; overflow-x: auto;">
     <pre style="margin:0; background:none; color:#00FF66;">{istatistik_text}</pre>
     </div>
-    """, unsafe_allow_html=True)
+    """, unsafe_output_allow=True if hasattr(st, 'markdown') else None, unsafe_allow_html=True)
 
-    # Maç Tablosu (Mobil Uyumlu Genişlik)
+    # X Formatına Birebir Uyarlanmış Maç Tablosu
     st.markdown("---")
     lines = []
-    header_line = f"{'TARİH':<10} | {'EV SAHİBİ':<15} | {'DEPLASMAN':<15} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
-    sep_line = "-" * 70
+    header_line = f"{'TARİH':<10} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
+    sep_line = "-" * 72
 
     lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
     lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        tarih = str(row.get('SEZON', ''))[:10]
-        ev = str(row.get('EV SAHİBİ', ''))[:14]
-        dep = str(row.get('DEPLASMAN', ''))[:14]
+        # Tarih kolonunu güvenli çekme
+        tarih_val = str(row.get('SEZON', ''))
+        tarih = tarih_val[:10] if len(tarih_val) >= 10 else f"{tarih_val:<10}"[:10]
+        
+        ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
+        dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
         iy_s = str(row.get('İY SKOR', ''))
         ms_s = str(row.get('MS SKOR', ''))
         ht_ft = str(row.get('HT/FT', ''))
@@ -183,7 +185,7 @@ if 'benzerler' in locals() and not benzerler.empty:
         else:
             ht_ft_disp = ht_ft
 
-        line_str = f"{tarih:<10} | {ev:<15} | {dep:<15} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
+        line_str = f"{tarih:<10} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
         
         if is_donus:
             lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
