@@ -67,11 +67,11 @@ st.markdown("---")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    ms1_input = st.text_input("MS 1 Oranı", value="3.04")
+    ms1_input = st.text_input("MS 1 Oranı (Kapalıysa 0 yaz)", value="0")
 with col2:
-    msx_input = st.text_input("MS X Oranı", value="2.84")
+    msx_input = st.text_input("MS X Oranı", value="7.29")
 with col3:
-    ms2_input = st.text_input("MS 2 Oranı", value="2.02")
+    ms2_input = st.text_input("MS 2 Oranı", value="13.30")
 with col4:
     tolerans_input = st.text_input("Tolerans (±)", value="0.04")
 
@@ -85,21 +85,27 @@ if btn_analiz:
         ms2_v = float(ms2_input.strip().replace(',', '.'))
         tol_v = float(tolerans_input.strip().replace(',', '.'))
     except ValueError:
-        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Örn: 1.85 / 0.03)")
+        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Kapalılar için 0 yazın)")
         st.stop()
 
     df_calc = df_clean.copy()
-    df_calc['Mesafe'] = np.sqrt(
-        (df_calc['MS1'] - ms1_v)**2 + 
-        (df_calc['MSX'] - msx_v)**2 + 
-        (df_calc['MS2'] - ms2_v)**2
-    )
+    
+    # AKILLI MESAFE HESABI: 0 girilen oranlar hesaba katılmaz!
+    fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
+    fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
+    fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
+    
+    df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2)
 
-    filtre = (
-        (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v) &
-        (df_calc['MSX'] >= msx_v - tol_v) & (df_calc['MSX'] <= msx_v + tol_v) &
-        (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
-    )
+    # AKILLI FİLTRELEME: Sadece 0'dan büyük (açık) oranlar filtrelenir
+    filtre = pd.Series(True, index=df_calc.index)
+    if ms1_v > 0:
+        filtre &= (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v)
+    if msx_v > 0:
+        filtre &= (df_calc['MSX'] >= msx_v - tol_v) & (df_calc['MSX'] <= msx_v + tol_v)
+    if ms2_v > 0:
+        filtre &= (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
+
     df_tolerans = df_calc[filtre].sort_values('Mesafe').copy()
 
     if not df_tolerans.empty:
@@ -159,7 +165,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # Maç Tablosu (SEZON/HAFTA Sütunu Genişletildi)
+    # Maç Tablosu
     st.markdown("---")
     lines = []
     header_line = f"{'SEZON / HAFTA':<18} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
@@ -170,7 +176,6 @@ if 'benzerler' in locals() and not benzerler.empty:
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        # Excel'deki sezon/hafta bilgisini tam alıyoruz (kesme yapmıyoruz)
         tarih = str(row.get('SEZON', ''))[:18].ljust(18)
         ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
         dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
@@ -192,17 +197,16 @@ if 'benzerler' in locals() and not benzerler.empty:
 
         line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
         
-        # Renk Atamaları
         if is_6plus:
-            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>") # Kırmızı (6+ Gol)
+            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>")
         elif is_donus:
-            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>") # Turuncu (1/2 - 2/1)
+            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
         elif is_1x:
-            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>") # Sarı (1/X)
+            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>")
         elif is_2x:
-            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>") # Mavi (2/X)
+            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>")
         else:
-            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>") # Standart Yeşil
+            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
 
     terminal_box = f"""
     <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
