@@ -155,7 +155,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     <div style="background-color: #000000; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #00FF66; border: 1px solid #222; overflow-x: auto;">
     <pre style="margin:0; background:none; color:#00FF66;">{istatistik_text}</pre>
     </div>
-    """, unsafe_output_allow=True if hasattr(st, 'markdown') else None, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # X Formatına Birebir Uyarlanmış Maç Tablosu
     st.markdown("---")
@@ -168,7 +168,6 @@ if 'benzerler' in locals() and not benzerler.empty:
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        # Tarih kolonunu güvenli çekme
         tarih_val = str(row.get('SEZON', ''))
         tarih = tarih_val[:10] if len(tarih_val) >= 10 else f"{tarih_val:<10}"[:10]
         
