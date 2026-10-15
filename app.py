@@ -159,19 +159,19 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # Maç Tablosu
+    # Maç Tablosu (SEZON/HAFTA Sütunu Genişletildi)
     st.markdown("---")
     lines = []
-    header_line = f"{'SEZON/TARİH':<12} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
-    sep_line = "-" * 74
+    header_line = f"{'SEZON / HAFTA':<18} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
+    sep_line = "-" * 80
 
     lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
     lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        # Tarih / Sezon sütununu tam genişlikte alıyoruz
-        tarih = str(row.get('SEZON', ''))[:12].ljust(12)
+        # Excel'deki sezon/hafta bilgisini tam alıyoruz (kesme yapmıyoruz)
+        tarih = str(row.get('SEZON', ''))[:18].ljust(18)
         ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
         dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
         iy_s = str(row.get('İY SKOR', ''))
@@ -192,7 +192,7 @@ if 'benzerler' in locals() and not benzerler.empty:
 
         line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
         
-        # Renk Atamaları (İstediğin Renk Paleti)
+        # Renk Atamaları
         if is_6plus:
             lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>") # Kırmızı (6+ Gol)
         elif is_donus:
