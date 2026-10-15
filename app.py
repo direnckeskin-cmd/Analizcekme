@@ -73,7 +73,7 @@ with col2:
 with col3:
     ms2_input = st.text_input("MS 2 Oranı", value="2.02")
 with col4:
-    tolerans_input = st.text_input("Tolerans (±)", value="0.03")
+    tolerans_input = st.text_input("Tolerans (±)", value="0.04")
 
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
@@ -143,21 +143,23 @@ if 'benzerler' in locals() and not benzerler.empty:
     ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # X Biçimli Üst İstatistik Alanı
-    istatistik_text = f"""
-    🟢 İY 0.5+ : % {iy_05:<2}  [60-90]
-    🟢 İY 1.5+ : % {iy_15:<2}  [15-45]
-    🟢 MS 2.5+ : % {ms_25:<2}  [20-50]
-    🟢 MS 3.5+ : % {ms_35:<2}  [5-35]
-    🏆 KG VAR  : % {kg_v:<2}  [50-80]
-    """
+    # ÜST İSTATİSTİKLER (ALT ALTA DÜZEN)
+    istatistik_lines = [
+        f"🟢 İY 0.5+ : %{iy_05:<2}  [60-90]",
+        f"🟢 İY 1.5+ : %{iy_15:<2}  [15-45]",
+        f"🟢 MS 2.5+ : %{ms_25:<2}  [20-50]",
+        f"🟢 MS 3.5+ : %{ms_35:<2}  [5-35]",
+        f"🏆 KG VAR  : %{kg_v:<2}  [50-80]"
+    ]
+    istatistik_html = "<br>".join(istatistik_lines)
+
     st.markdown(f"""
-    <div style="background-color: #000000; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #00FF66; border: 1px solid #222; overflow-x: auto;">
-    <pre style="margin:0; background:none; color:#00FF66;">{istatistik_text}</pre>
+    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; color: #00FF66; border: 1px solid #222; line-height: 1.6;">
+    {istatistik_html}
     </div>
     """, unsafe_allow_html=True)
 
-    # X Formatına Birebir Uyarlanmış Maç Tablosu
+    # Maç Tablosu
     st.markdown("---")
     lines = []
     header_line = f"{'TARİH':<10} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
@@ -222,10 +224,11 @@ if 'benzerler' in locals() and not benzerler.empty:
             ms_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
         st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(ms_trend_lines)}</div>", unsafe_allow_html=True)
 
-    # Risk Bandı
+    # DÜZELTİLMİŞ AKILLI RİSK BANDI (Hassasiyet Artırıldı: %8 üstü veya 2+ dönüş varsa uyarır)
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
-    if donus_orani >= 15:
-        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında Maç İçi Ters Köşe (1/2 veya 2/X) Potansiyeli Taşıyor!"
+    
+    if donus_orani >= 8 or donus_sayisi >= 2:
+        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/X) Potansiyeli Taşıyor!"
         st.markdown(f"""
         <div style="background-color: #8B0000; color: #FFFFFF; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
         {uyari_mesaji}
