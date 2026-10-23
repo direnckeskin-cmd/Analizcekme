@@ -242,7 +242,8 @@ if 'benzerler' in locals() and not benzerler.empty:
     # Risk Bandı
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
     if donus_orani >= 8 or donus_sayisi >= 2:
-        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/X) Potansiyeli Taşıyor!"
+        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
+
         st.markdown(f"""
         <div style="background-color: #8B0000; color: #FFFFFF; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
         {uyari_mesaji}
