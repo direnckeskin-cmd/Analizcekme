@@ -147,6 +147,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     iy_15 = round((benzerler['iy_toplam'] >= 2).mean() * 100)
     ms_25 = round((benzerler['ms_toplam'] >= 3).mean() * 100)
     ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
+    ms_6plus_pct = round((benzerler['ms_toplam'] >= 6).mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
     # ÜST İSTATİSTİKLER (ALT ALTA)
@@ -155,6 +156,7 @@ if 'benzerler' in locals() and not benzerler.empty:
         f"🟢 İY 1.5+ : %{iy_15:<2}  [15-45]",
         f"🟢 MS 2.5+ : %{ms_25:<2}  [20-50]",
         f"🟢 MS 3.5+ : %{ms_35:<2}  [5-35]",
+        f"🔥 6+ GOL  : %{ms_6plus_pct:<2}  [SÜRPRİZ]",
         f"🏆 KG VAR  : %{kg_v:<2}  [50-80]"
     ]
     istatistik_html = "<br>".join(istatistik_lines)
