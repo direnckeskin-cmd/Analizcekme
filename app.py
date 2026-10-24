@@ -134,6 +134,14 @@ if 'benzerler' in locals() and not benzerler.empty:
     benzerler['iy_toplam'] = benzerler['iy_e'] + benzerler['iy_d']
     benzerler['ms_toplam'] = benzerler['ms_e'] + benzerler['ms_d']
     benzerler['kg_var'] = (benzerler['ms_e'] > 0) & (benzerler['ms_d'] > 0)
+    
+    # Ortak Hesaplama: İlk Yarı KG Var ve İkinci Yarı KG Var'ın İkisinin de Gerçekleştiği Maçlar
+    iy_kg_var = (benzerler['iy_e'] > 0) & (benzerler['iy_d'] > 0)
+    ikinci_yari_e = benzerler['ms_e'] - benzerler['iy_e']
+    ikinci_yari_d = benzerler['ms_d'] - benzerler['iy_d']
+    ikinci_yari_kg_var = (ikinci_yari_e > 0) & (ikinci_yari_d > 0)
+    
+    benzerler['her_iki_yari_kg_var'] = iy_kg_var & ikinci_yari_kg_var
 
     def get_ht_ft(row):
         ht = '1' if row['iy_e'] > row['iy_d'] else ('2' if row['iy_d'] > row['iy_e'] else 'X')
@@ -148,16 +156,18 @@ if 'benzerler' in locals() and not benzerler.empty:
     ms_25 = round((benzerler['ms_toplam'] >= 3).mean() * 100)
     ms_35 = round((benzerler['ms_toplam'] >= 4).mean() * 100)
     ms_6plus_pct = round((benzerler['ms_toplam'] >= 6).mean() * 100)
+    her_iki_yari_kg_pct = round(benzerler['her_iki_yari_kg_var'].mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # ÜST İSTATİSTİKLER (ALT ALTA)
+    # ÜST İSTATİSTİKLER
     istatistik_lines = [
-        f"🟢 İY 0.5+ : %{iy_05:<2}  [60-90]",
-        f"🟢 İY 1.5+ : %{iy_15:<2}  [15-45]",
-        f"🟢 MS 2.5+ : %{ms_25:<2}  [20-50]",
-        f"🟢 MS 3.5+ : %{ms_35:<2}  [5-35]",
-        f"🔥 6+ GOL  : %{ms_6plus_pct:<2}  [SÜRPRİZ]",
-        f"🏆 KG VAR  : %{kg_v:<2}  [50-80]"
+        f"🟢 İY 0.5+        : %{iy_05:<2}  [60-90]",
+        f"🟢 İY 1.5+        : %{iy_15:<2}  [15-45]",
+        f"🟢 MS 2.5+        : %{ms_25:<2}  [20-50]",
+        f"🟢 MS 3.5+        : %{ms_35:<2}  [5-35]",
+        f"🔥 6+ GOL         : %{ms_6plus_pct:<2}  [SÜRPRİZ]",
+        f"⚡ İY. KG - 2.Y KG : %{her_iki_yari_kg_pct:<2}  [HER İKİ YARI]",
+        f"🏆 KG VAR         : %{kg_v:<2}  [50-80]"
     ]
     istatistik_html = "<br>".join(istatistik_lines)
 
