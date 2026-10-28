@@ -248,7 +248,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </table>
     </div>
     """
-    st.markdown(table_html, unsafe_allow_html=True)
+    st.markdown(table_html, unsafe_allow_html=True)  # <-- DÜZELTİLDİ: unsafe_allow_html=True eklendi!
 
     # Skor Trendleri
     st.markdown("---")
