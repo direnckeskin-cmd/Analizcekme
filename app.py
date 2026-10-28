@@ -6,13 +6,11 @@ import numpy as np
 # Sayfa Ayarları (Telefona Tam Uyumlu)
 st.set_page_config(page_title="Oran Analiz Pro", page_icon="⚽", layout="centered")
 
-# Mobil Dostu Şık CSS Tasarımı
+# CSS Tasarımı
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #e2e8f0; }
     .stat-card { background-color: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 15px; margin-bottom: 12px; font-family: sans-serif; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .match-row { background-color: #0f172a; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; font-family: sans-serif; }
-    .match-row-signal { background-color: #1a150b; border-left: 4px solid #f59e0b; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; font-family: sans-serif; }
     .trend-box { background-color: #111827; border: 1px solid #1f2c47; padding: 12px; border-radius: 8px; font-size: 13px; font-family: sans-serif; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
@@ -180,15 +178,20 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # Maç Listesi (Alt alta temiz kartlar şeklinde, sağa kaydırma derdi yok)
+    # --- ESKİ KLASİK TERMINAL / TABLO GÖRÜNÜMÜ ---
     st.markdown("---")
-    st.markdown("### 📋 Benzer Maç Havuzu")
+    lines = []
+    header_line = f"{'SEZON / HAFTA':<18} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
+    sep_line = "-" * 80
+
+    lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
+    lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        tarih = str(row.get('SEZON', ''))[:16]
-        ev = str(row.get('EV SAHİBİ', ''))
-        dep = str(row.get('DEPLASMAN', ''))
+        tarih = str(row.get('SEZON', ''))[:18].ljust(18)
+        ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
+        dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
         iy_s = str(row.get('İY SKOR', ''))
         ms_s = str(row.get('MS SKOR', ''))
         ht_ft = str(row.get('HT/FT', ''))
@@ -205,25 +208,25 @@ if 'benzerler' in locals() and not benzerler.empty:
         else:
             ht_ft_disp = ht_ft
 
-        # Renk ve stil ayarları
-        row_class = "match-row-signal" if (is_donus or is_6plus) else "match-row"
-        renk = "#34d399" # Yeşil varsayılan
-        if is_6plus: renk = "#f87171" # Kırmızı
-        elif is_donus: renk = "#fbbf24" # Turuncu
-        elif is_1x: renk = "#facc15" # Sarı
-        elif is_2x: renk = "#38bdf8" # Mavi
+        line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
+        
+        if is_6plus:
+            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>")
+        elif is_donus:
+            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
+        elif is_1x:
+            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>")
+        elif is_2x:
+            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>")
+        else:
+            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
 
-        match_card_html = f"""
-        <div class="{row_class}">
-            <div style="color: #94a3b8; font-size: 11px; margin-bottom: 2px;">{tarih}</div>
-            <div style="font-weight: bold; color: #ffffff; font-size: 14px; margin-bottom: 4px;">{ev} vs {dep}</div>
-            <div style="display: flex; justify-content: space-between; color: {renk}; font-weight: bold;">
-                <span>İY: {iy_s} &nbsp;|&nbsp; MS: {ms_s}</span>
-                <span>HT/FT: {ht_ft_disp}</span>
-            </div>
-        </div>
-        """
-        st.markdown(match_card_html, unsafe_allow_html=True)
+    terminal_box = f"""
+    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
+    {"<br>".join(lines)}
+    </div>
+    """
+    st.markdown(terminal_box, unsafe_allow_html=True)
 
     # Skor Trendleri
     st.markdown("---")
