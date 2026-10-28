@@ -178,20 +178,30 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- ESKİ KLASİK TERMINAL / TABLO GÖRÜNÜMÜ ---
+    # --- MOBİL UYUMLU DÜZGÜN HTML TABLO GÖRÜNÜMÜ ---
     st.markdown("---")
-    lines = []
-    header_line = f"{'SEZON / HAFTA':<18} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
-    sep_line = "-" * 80
-
-    lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
-    lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
+    
+    table_html = """
+    <div style="background-color: #000000; padding: 10px; border-radius: 8px; overflow-x: auto; border: 1px solid #222;">
+    <table style="width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 11px; color: #00FF66;">
+        <thead>
+            <tr style="border-bottom: 1px solid #333; text-align: left;">
+                <th style="padding: 6px;">SEZON/HAFTA</th>
+                <th style="padding: 6px;">EV SAHİBİ - DEPLASMAN</th>
+                <th style="padding: 6px; text-align: center;">İY</th>
+                <th style="padding: 6px; text-align: center;">MS</th>
+                <th style="padding: 6px; text-align: center;">HT/FT</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        tarih = str(row.get('SEZON', ''))[:18].ljust(18)
-        ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
-        dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
+        tarih = str(row.get('SEZON', ''))[:16]
+        ev = str(row.get('EV SAHİBİ', ''))[:13]
+        dep = str(row.get('DEPLASMAN', ''))[:13]
+        mac_adi = f"{ev} - {dep}"
         iy_s = str(row.get('İY SKOR', ''))
         ms_s = str(row.get('MS SKOR', ''))
         ht_ft = str(row.get('HT/FT', ''))
@@ -208,25 +218,37 @@ if 'benzerler' in locals() and not benzerler.empty:
         else:
             ht_ft_disp = ht_ft
 
-        line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
-        
+        renk = "#00FF66"
+        font_weight = "normal"
         if is_6plus:
-            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>")
+            renk = "#FF3333"
+            font_weight = "bold"
         elif is_donus:
-            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
+            renk = "#FF8C00"
+            font_weight = "bold"
         elif is_1x:
-            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>")
+            renk = "#FFD700"
+            font_weight = "bold"
         elif is_2x:
-            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>")
-        else:
-            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
+            renk = "#00BFFF"
+            font_weight = "bold"
 
-    terminal_box = f"""
-    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
-    {"<br>".join(lines)}
+        table_html += f"""
+            <tr style="border-bottom: 1px solid #111; color: {renk}; font-weight: {font_weight};">
+                <td style="padding: 6px; white-space: nowrap;">{tarih}</td>
+                <td style="padding: 6px; white-space: nowrap;">{mac_adi}</td>
+                <td style="padding: 6px; text-align: center; white-space: nowrap;">{iy_s}</td>
+                <td style="padding: 6px; text-align: center; white-space: nowrap;">{ms_s}</td>
+                <td style="padding: 6px; text-align: center; white-space: nowrap;">{ht_ft_disp}</td>
+            </tr>
+        """
+
+    table_html += """
+        </tbody>
+    </table>
     </div>
     """
-    st.markdown(terminal_box, unsafe_allow_html=True)
+    st.markdown(table_html, unsafe_allow_html=True)
 
     # Skor Trendleri
     st.markdown("---")
