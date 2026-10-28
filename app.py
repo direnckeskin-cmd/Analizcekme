@@ -1,10 +1,21 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
 
 # Sayfa Ayarları (Telefona Tam Uyumlu)
 st.set_page_config(page_title="Oran Analiz Pro", page_icon="⚽", layout="centered")
+
+# Mobil Dostu Şık CSS Tasarımı
+st.markdown("""
+    <style>
+    .stApp { background-color: #0b0f19; color: #e2e8f0; }
+    .stat-card { background-color: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 15px; margin-bottom: 12px; font-family: sans-serif; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .match-row { background-color: #0f172a; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; font-family: sans-serif; }
+    .match-row-signal { background-color: #1a150b; border-left: 4px solid #f59e0b; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; font-family: sans-serif; }
+    .trend-box { background-color: #111827; border: 1px solid #1f2c47; padding: 12px; border-radius: 8px; font-size: 13px; font-family: sans-serif; margin-bottom: 10px; }
+    </style>
+""", unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_PATH = os.path.join(BASE_DIR, "ORAN ANALİZ TABLOSU.xlsb")
@@ -33,7 +44,7 @@ def load_data():
     except Exception as e:
         return None
 
-st.markdown("<h2 style='text-align: center; color: #00FF7F;'>⚽ ORAN ANALİZ VE PATTERN MOTORU</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 22px; margin-bottom: 20px;'>⚽ ORAN ANALİZ VE PATTERN MOTORU</h2>", unsafe_allow_html=True)
 
 with st.spinner("📊 Veriler yükleniyor..."):
     df_clean = load_data()
@@ -67,13 +78,13 @@ st.markdown("---")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    ms1_input = st.text_input("MS 1 Oranı (Kapalıysa 0 yaz)", value="0")
+    ms1_input = st.text_input("MS 1", value="0")
 with col2:
-    msx_input = st.text_input("MS X Oranı", value="7.29")
+    msx_input = st.text_input("MS X", value="7.29")
 with col3:
-    ms2_input = st.text_input("MS 2 Oranı", value="13.30")
+    ms2_input = st.text_input("MS 2", value="13.30")
 with col4:
-    tolerans_input = st.text_input("Tolerans (±)", value="0.04")
+    tolerans_input = st.text_input("Tolerans", value="0.04")
 
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
@@ -90,14 +101,12 @@ if btn_analiz:
 
     df_calc = df_clean.copy()
     
-    # AKILLI MESAFE HESABI: 0 girilen oranlar hesaba katılmaz!
     fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
     fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
     fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
     
     df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2)
 
-    # AKILLI FİLTRELEME: Sadece 0'dan büyük (açık) oranlar filtrelenir
     filtre = pd.Series(True, index=df_calc.index)
     if ms1_v > 0:
         filtre &= (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v)
@@ -112,12 +121,12 @@ if btn_analiz:
         toplam_bulunan = len(df_tolerans)
         if tumunu_goster:
             benzerler = df_tolerans.copy()
-            st.info(f"🔍 ±{tol_v} tolerans aralığında {toplam_bulunan} maç bulundu. Tüm maçlar listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
         else:
             benzerler = df_tolerans.head(20).copy()
-            st.info(f"🔍 ±{tol_v} tolerans aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
     else:
-        st.warning(f"⚠️ ±{tol_v} tolerans aralığında tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
+        st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
 
 def skor_ayir(s):
@@ -135,7 +144,6 @@ if 'benzerler' in locals() and not benzerler.empty:
     benzerler['ms_toplam'] = benzerler['ms_e'] + benzerler['ms_d']
     benzerler['kg_var'] = (benzerler['ms_e'] > 0) & (benzerler['ms_d'] > 0)
     
-    # Ortak Hesaplama: İlk Yarı KG Var ve İkinci Yarı KG Var'ın İkisinin de Gerçekleştiği Maçlar
     iy_kg_var = (benzerler['iy_e'] > 0) & (benzerler['iy_d'] > 0)
     ikinci_yari_e = benzerler['ms_e'] - benzerler['iy_e']
     ikinci_yari_d = benzerler['ms_d'] - benzerler['iy_d']
@@ -159,38 +167,28 @@ if 'benzerler' in locals() and not benzerler.empty:
     her_iki_yari_kg_pct = round(benzerler['her_iki_yari_kg_var'].mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # ÜST İSTATİSTİKLER
-    istatistik_lines = [
-        f"🟢 İY 0.5+        : %{iy_05:<2}  [60-90]",
-        f"🟢 İY 1.5+        : %{iy_15:<2}  [15-45]",
-        f"🟢 MS 2.5+        : %{ms_25:<2}  [20-50]",
-        f"🟢 MS 3.5+        : %{ms_35:<2}  [5-35]",
-        f"🔥 6+ GOL         : %{ms_6plus_pct:<2}  [SÜRPRİZ]",
-        f"⚡ İY. KG - 2.Y KG : %{her_iki_yari_kg_pct:<2}  [HER İKİ YARI]",
-        f"🏆 KG VAR         : %{kg_v:<2}  [50-80]"
-    ]
-    istatistik_html = "<br>".join(istatistik_lines)
-
+    # ÜST İSTATİSTİKLER (Şık Kart Tasarımı)
     st.markdown(f"""
-    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; color: #00FF66; border: 1px solid #222; line-height: 1.6;">
-    {istatistik_html}
+    <div class="stat-card">
+        <b>🟢 İY 0.5+</b> &nbsp;:&nbsp; %{iy_05} &nbsp;&nbsp;<span style="color:#9ca3af;">[60-90]</span><br>
+        <b>🟢 İY 1.5+</b> &nbsp;:&nbsp; %{iy_15} &nbsp;&nbsp;<span style="color:#9ca3af;">[15-45]</span><br>
+        <b>🟢 MS 2.5+</b> &nbsp;:&nbsp; %{ms_25} &nbsp;&nbsp;<span style="color:#9ca3af;">[20-50]</span><br>
+        <b>🟢 MS 3.5+</b> &nbsp;:&nbsp; %{ms_35} &nbsp;&nbsp;<span style="color:#9ca3af;">[5-35]</span><br>
+        <b>🔥 6+ GOL</b> &nbsp;&nbsp;&nbsp;:&nbsp; %{ms_6plus_pct} &nbsp;&nbsp;<span style="color:#f59e0b;">[SÜRPRİZ]</span><br>
+        <b>⚡ İY/2Y KG</b> &nbsp;:&nbsp; %{her_iki_yari_kg_pct} &nbsp;&nbsp;<span style="color:#f59e0b;">[HER İKİ YARI]</span><br>
+        <b>🏆 KG VAR</b> &nbsp;&nbsp;&nbsp;:&nbsp; %{kg_v} &nbsp;&nbsp;<span style="color:#9ca3af;">[50-80]</span>
     </div>
     """, unsafe_allow_html=True)
 
-    # Maç Tablosu
+    # Maç Listesi (Alt alta temiz kartlar şeklinde, sağa kaydırma derdi yok)
     st.markdown("---")
-    lines = []
-    header_line = f"{'SEZON / HAFTA':<18} | {'EV SAHİBİ':<16} | {'DEPLASMAN':<16} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
-    sep_line = "-" * 80
-
-    lines.append(f"<span style='color:#00FF66;'>{header_line}</span>")
-    lines.append(f"<span style='color:#00FF66;'>{sep_line}</span>")
+    st.markdown("### 📋 Benzer Maç Havuzu")
 
     donus_sayisi = 0
     for _, row in benzerler.iterrows():
-        tarih = str(row.get('SEZON', ''))[:18].ljust(18)
-        ev = str(row.get('EV SAHİBİ', ''))[:15].ljust(15)
-        dep = str(row.get('DEPLASMAN', ''))[:15].ljust(15)
+        tarih = str(row.get('SEZON', ''))[:16]
+        ev = str(row.get('EV SAHİBİ', ''))
+        dep = str(row.get('DEPLASMAN', ''))
         iy_s = str(row.get('İY SKOR', ''))
         ms_s = str(row.get('MS SKOR', ''))
         ht_ft = str(row.get('HT/FT', ''))
@@ -207,25 +205,25 @@ if 'benzerler' in locals() and not benzerler.empty:
         else:
             ht_ft_disp = ht_ft
 
-        line_str = f"{tarih} | {ev} | {dep} | {iy_s:<4} | {ms_s:<4} | {ht_ft_disp:<7}"
-        
-        if is_6plus:
-            lines.append(f"<span style='color:#FF3333; font-weight:bold;'>{line_str}</span>")
-        elif is_donus:
-            lines.append(f"<span style='color:#FF8C00; font-weight:bold;'>{line_str}</span>")
-        elif is_1x:
-            lines.append(f"<span style='color:#FFD700; font-weight:bold;'>{line_str}</span>")
-        elif is_2x:
-            lines.append(f"<span style='color:#00BFFF; font-weight:bold;'>{line_str}</span>")
-        else:
-            lines.append(f"<span style='color:#00FF66;'>{line_str}</span>")
+        # Renk ve stil ayarları
+        row_class = "match-row-signal" if (is_donus or is_6plus) else "match-row"
+        renk = "#34d399" # Yeşil varsayılan
+        if is_6plus: renk = "#f87171" # Kırmızı
+        elif is_donus: renk = "#fbbf24" # Turuncu
+        elif is_1x: renk = "#facc15" # Sarı
+        elif is_2x: renk = "#38bdf8" # Mavi
 
-    terminal_box = f"""
-    <div style="background-color: #000000; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #222;">
-    {"<br>".join(lines)}
-    </div>
-    """
-    st.markdown(terminal_box, unsafe_allow_html=True)
+        match_card_html = f"""
+        <div class="{row_class}">
+            <div style="color: #94a3b8; font-size: 11px; margin-bottom: 2px;">{tarih}</div>
+            <div style="font-weight: bold; color: #ffffff; font-size: 14px; margin-bottom: 4px;">{ev} vs {dep}</div>
+            <div style="display: flex; justify-content: space-between; color: {renk}; font-weight: bold;">
+                <span>İY: {iy_s} &nbsp;|&nbsp; MS: {ms_s}</span>
+                <span>HT/FT: {ht_ft_disp}</span>
+            </div>
+        </div>
+        """
+        st.markdown(match_card_html, unsafe_allow_html=True)
 
     # Skor Trendleri
     st.markdown("---")
@@ -234,22 +232,24 @@ if 'benzerler' in locals() and not benzerler.empty:
     col_t1, col_t2 = st.columns(2)
 
     with col_t1:
-        st.markdown("##### ⚽ İY SKOR TRENDİ")
+        st.markdown("##### ⚽ İY SKOR")
         iy_counts = benzerler['İY SKOR'].value_counts().head(6)
         iy_trend_lines = []
         for skor, count in iy_counts.items():
             pct = (count / toplam_mac) * 100
-            iy_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
-        st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(iy_trend_lines)}</div>", unsafe_allow_html=True)
+            iy_trend_lines.append(f"🟢 <b>{skor}</b> : {count} Maç (%{pct:.0f})")
+        iy_html = "<br>".join(iy_trend_lines)
+        st.markdown(f"<div class='trend-box'>{iy_html}</div>", unsafe_allow_html=True)
 
     with col_t2:
-        st.markdown("##### ⚽ MS SKOR TRENDİ (İLK 8)")
+        st.markdown("##### ⚽ MS SKOR")
         ms_counts = benzerler['MS SKOR'].value_counts().head(8)
         ms_trend_lines = []
         for skor, count in ms_counts.items():
             pct = (count / toplam_mac) * 100
-            ms_trend_lines.append(f"🟢 {skor:<5} : {count} Maç (%{pct:.0f})")
-        st.markdown(f"<div style='background:#0b0b0b; padding:10px; border-radius:6px; font-family:monospace; font-size:12px; color:#00FF66;'>{'<br>'.join(ms_trend_lines)}</div>", unsafe_allow_html=True)
+            ms_trend_lines.append(f"🟢 <b>{skor}</b> : {count} Maç (%{pct:.0f})")
+        ms_html = "<br>".join(ms_trend_lines)
+        st.markdown(f"<div class='trend-box'>{ms_html}</div>", unsafe_allow_html=True)
 
     # Risk Bandı
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
@@ -257,13 +257,13 @@ if 'benzerler' in locals() and not benzerler.empty:
         uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
 
         st.markdown(f"""
-        <div style="background-color: #8B0000; color: #FFFFFF; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
+        <div style="background-color: #7f1d1d; color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px; border: 1px solid #991b1b;">
         {uyari_mesaji}
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
-        <div style="background-color: #004d1a; color: #00FF66; padding: 10px 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px;">
+        <div style="background-color: #064e3b; color: #6ee7b7; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: bold; text-align: center; margin-top: 15px; border: 1px solid #065f46;">
         ✅ Oran Havuzu İstikrarlı Seyrediyor (Ters köşe riski düşük).
         </div>
         """, unsafe_allow_html=True)
