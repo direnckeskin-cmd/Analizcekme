@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Sayfa Ayarları (Telefona Tam Uyumlu)
-st.set_page_config(page_title="Oran Analiz Pro", page_icon="⚽", layout="centered")
+st.set_page_config(page_title="Oran Analiz Pro AI", page_icon="⚽", layout="centered")
 
 # CSS Tasarımı (Tek Ekrana Sığması İçin Kompakt Boşluklar)
 st.markdown("""
@@ -41,7 +41,7 @@ def load_data():
     except Exception as e:
         return None
 
-st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 8px;'>⚽ ORAN ANALİZ VE PATTERN MOTORU</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 8px;'>⚽ ORAN ANALİZ VE AKILLI PATTERN MOTORU</h2>", unsafe_allow_html=True)
 
 with st.spinner("📊 Veriler yükleniyor..."):
     df_clean = load_data()
@@ -62,7 +62,7 @@ if lig_kolonu:
     tum_ligler = sorted(df_clean[lig_kolonu].dropna().unique().tolist())
     
     st.markdown("### 🏆 Lig Filtreleme")
-    secilen_ligler = st.multiselect(
+    secilen_ligler = multiselect_ligler = st.multiselect(
         "Analize dahil etmek istediğin ligleri seç (Boş bırakırsan hepsi taranır):",
         options=tum_ligler,
         default=tum_ligler
@@ -81,7 +81,8 @@ with col2:
 with col3:
     ms2_input = st.text_input("MS 2", value="13.30")
 with col4:
-    tolerans_input = st.text_input("Tolerans", value="0.04")
+    # Kullanıcı isterse hala manuel müdahale edebilir ama boş bırakırsa/otomatik modda çalışır
+    otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
 
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
@@ -91,7 +92,6 @@ if btn_analiz:
         ms1_v = float(ms1_input.strip().replace(',', '.'))
         msx_v = float(msx_input.strip().replace(',', '.'))
         ms2_v = float(ms2_input.strip().replace(',', '.'))
-        tol_v = float(tolerans_input.strip().replace(',', '.'))
     except ValueError:
         st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Kapalılar için 0 yazın)")
         st.stop()
@@ -104,13 +104,34 @@ if btn_analiz:
     
     df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2)
 
-    filtre = pd.Series(True, index=df_calc.index)
-    if ms1_v > 0:
-        filtre &= (df_calc['MS1'] >= ms1_v - tol_v) & (df_calc['MS1'] <= ms1_v + tol_v)
-    if msx_v > 0:
-        filtre &= (df_calc['MSX'] >= msx_v - tol_v) & (df_calc['MSX'] <= msx_v + tol_v)
-    if ms2_v > 0:
-        filtre &= (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
+    # AKILLI TOLERANS ALGORİTMASI (AI MODU)
+    if otomatik_mod:
+        secilen_tol = 0.02
+        filtre = pd.Series(False, index=df_calc.index)
+        
+        # Kademeli olarak en ideal maç havuzunu (en az 15-20 maç) bulana kadar toleransı artırır
+        for t in [0.02, 0.04, 0.06, 0.08, 0.10]:
+            temp_filtre = pd.Series(True, index=df_calc.index)
+            if ms1_v > 0:
+                temp_filtre &= (df_calc['MS1'] >= ms1_v - t) & (df_calc['MS1'] <= ms1_v + t)
+            if msx_v > 0:
+                temp_filtre &= (df_calc['MSX'] >= msx_v - t) & (df_calc['MSX'] <= msx_v + t)
+            if ms2_v > 0:
+                temp_filtre &= (df_calc['MS2'] >= ms2_v - t) & (df_calc['MS2'] <= ms2_v + t)
+            
+            secilen_tol = t
+            if temp_filtre.sum() >= 15 or t == 0.10:
+                filtre = temp_filtre
+                break
+    else:
+        secilen_tol = 0.04
+        filtre = pd.Series(True, index=df_calc.index)
+        if ms1_v > 0:
+            filtre &= (df_calc['MS1'] >= ms1_v - secilen_tol) & (df_calc['MS1'] <= ms1_v + secilen_tol)
+        if msx_v > 0:
+            filtre &= (df_calc['MSX'] >= msx_v - secilen_tol) & (df_calc['MSX'] <= msx_v + secilen_tol)
+        if ms2_v > 0:
+            filtre &= (df_calc['MS2'] >= ms2_v - secilen_tol) & (df_calc['MS2'] <= ms2_v + secilen_tol)
 
     df_tolerans = df_calc[filtre].copy()
 
@@ -131,17 +152,16 @@ if btn_analiz:
             return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
 
         df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
-        # Önce sürpriz olanlar (1), sonra mesafe yakınlığına göre sıralama
         df_tolerans = df_tolerans.sort_values(by=['surpriz_flag', 'Mesafe'], ascending=[False, True]).copy()
 
     if not df_tolerans.empty:
         toplam_bulunan = len(df_tolerans)
         if tumunu_goster:
             benzerler = df_tolerans.copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
+            st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
         else:
             benzerler = df_tolerans.head(20).copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
+            st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
     else:
         st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
@@ -202,7 +222,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     """, unsafe_allow_html=True)
 
     # 2. İY VE MS SKOR TRENDLERİ (YAN YANA, 6'ŞAR SEÇENEK - SIKIŞTIRILMIŞ)
-    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - AKILLI AI MODU)</p>", unsafe_allow_html=True)
     
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
     ms_counts = benzerler['MS SKOR'].value_counts().head(6)
