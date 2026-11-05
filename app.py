@@ -120,8 +120,8 @@ if btn_analiz:
             benzerler = df_tolerans.copy()
             st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
         else:
-            benzerler = df_tolerans.head(20).copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
+            benzerler = df_tolerans.head(10).copy()
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 10 tanesi listeleniyor.")
     else:
         st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
