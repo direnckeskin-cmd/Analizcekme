@@ -81,9 +81,9 @@ with col2:
 with col3:
     ms2_input = st.text_input("MS 2", value="13.30")
 with col4:
-    tolerans_input = st.text_input("Tolerans", value="0.04")
+    # Tolerans varsayılanını istediğin gibi geniş aralıklar için 0.05 yaptık
+    tolerans_input = st.text_input("Tolerans", value="0.05")
 
-tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
 
 if btn_analiz:
@@ -112,19 +112,16 @@ if btn_analiz:
     if ms2_v > 0:
         filtre &= (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
 
+    # Tolerans aralığına giren TÜM maçları alıyoruz (Artık .head() sınırı yok, kaç tane bulursa!)
     df_tolerans = df_calc[filtre].sort_values('Mesafe').copy()
 
     if not df_tolerans.empty:
         toplam_bulunan = len(df_tolerans)
-        if tumunu_goster:
-            benzerler = df_tolerans.copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
-        else:
-            benzerler = df_tolerans.head(10).copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 10 tanesi listeleniyor.")
+        benzerler = df_tolerans.copy()
+        st.info(f"🔍 ±{tol_v} aralığında toplam {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
     else:
-        st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
-        benzerler = df_calc.sort_values('Mesafe').head(10).copy()
+        st.warning(f"⚠️ Bu tolerans aralığında tam eşleşme bulunamadı. En yakın 20 maç listeleniyor.")
+        benzerler = df_calc.sort_values('Mesafe').head(20).copy()
 
 def skor_ayir(s):
     try:
@@ -182,7 +179,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     """, unsafe_allow_html=True)
 
     # 2. İY VE MS SKOR TRENDLERİ (YAN YANA, 6'ŞAR SEÇENEK - SIKIŞTIRILMIŞ)
-    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - TÜM EŞLEŞENLER)</p>", unsafe_allow_html=True)
     
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
     ms_counts = benzerler['MS SKOR'].value_counts().head(6)
@@ -201,7 +198,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO
+    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (BULUNAN TÜM MAÇLAR)
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
     sep_line = "-" * 48
@@ -250,7 +247,7 @@ if 'benzerler' in locals() and not benzerler.empty:
         lines.append(f"<span style='color:{renk}; font-weight:{font_weight};'>{line_str}</span>")
 
     terminal_box = f"""
-    <div style="background-color: #000000; padding: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.3; white-space: pre; overflow-x: auto; border: 1px solid #222;">
+    <div style="background-color: #000000; padding: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.3; white-space: pre; overflow-x: auto; border: 1px solid #222; max-height: 300px;">
     {"<br>".join(lines)}
     </div>
     """
