@@ -83,7 +83,7 @@ with col3:
 with col4:
     tolerans_input = st.text_input("Tolerans", value="0.04")
 
-tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
+tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
 
 if btn_analiz:
@@ -112,16 +112,36 @@ if btn_analiz:
     if ms2_v > 0:
         filtre &= (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
 
-    df_tolerans = df_calc[filtre].sort_values('Mesafe').copy()
+    df_tolerans = df_calc[filtre].copy()
+
+    def skor_ayir_temp(s):
+        try:
+            p = str(s).strip().split('-')
+            return int(p[0]), int(p[1])
+        except:
+            return 0, 0
+
+    # Sürpriz (1/2 veya 2/1) olanları öne taşıyan akıllı sıralama mantığı
+    if not df_tolerans.empty:
+        def check_surpriz_row(row):
+            e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
+            e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
+            h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
+            f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
+            return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
+
+        df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
+        # Önce sürpriz olanlar (1), sonra mesafe yakınlığına göre sıralama
+        df_tolerans = df_tolerans.sort_values(by=['surpriz_flag', 'Mesafe'], ascending=[False, True]).copy()
 
     if not df_tolerans.empty:
         toplam_bulunan = len(df_tolerans)
         if tumunu_goster:
             benzerler = df_tolerans.copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
         else:
             benzerler = df_tolerans.head(20).copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
     else:
         st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
