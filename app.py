@@ -83,7 +83,7 @@ with col3:
 with col4:
     tolerans_input = st.text_input("Tolerans", value="0.04")
 
-tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=False)
+tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (20 sınırı olmasın)", value=False)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
 
 if btn_analiz:
@@ -112,44 +112,16 @@ if btn_analiz:
     if ms2_v > 0:
         filtre &= (df_calc['MS2'] >= ms2_v - tol_v) & (df_calc['MS2'] <= ms2_v + tol_v)
 
-    df_tolerans = df_calc[filtre].copy()
-
-    def skor_ayir_temp(s):
-        try:
-            p = str(s).strip().split('-')
-            return int(p[0]), int(p[1])
-        except:
-            return 0, 0
-
-    # Geçici HT/FT tespiti ile sürprizleri (1/2 veya 2/1) öne çıkarma puanı (Önceliklendirme)
-    if not df_tolerans.empty:
-        temp_iy = df_tolerans['İY SKOR'].apply(lambda x: pd.Series(skor_ayir_temp(x)))
-        temp_ms = df_tolerans['MS SKOR'].apply(lambda x: pd.Series(skor_ayir_temp(x)))
-        ht = temp_iy[0] > temp_iy[1] # Basit mantık
-        # Sürpriz skoru yüksek olanlara öncelik puanı verelim
-        df_tolerans['is_surpriz'] = df_tolerans.apply(lambda r: 1 if (r['İY SKOR'] not in ['nan', ''] and r['MS SKOR'] not in ['nan', '']) else 0, axis=1)
-        
-        # Sıralama: Önce mesafe yakınlığı, ancak sürpriz (1/2 veya 2/1) barındıranlar filtrenin içinde üste kaysın
-        def check_surpriz_row(row):
-            e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
-            e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
-            h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
-            f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
-            return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
-
-        df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
-        
-        # Sıralama mantığı: Önce sürpriz olanlar (1 demek önde olsun diye -surpriz_flag), sonra en az mesafe
-        df_tolerans = df_tolerans.sort_values(by=['surpriz_flag', 'Mesafe'], ascending=[False, True]).copy()
+    df_tolerans = df_calc[filtre].sort_values('Mesafe').copy()
 
     if not df_tolerans.empty:
         toplam_bulunan = len(df_tolerans)
         if tumunu_goster:
             benzerler = df_tolerans.copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. Hepsi listeleniyor.")
         else:
             benzerler = df_tolerans.head(20).copy()
-            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
+            st.info(f"🔍 ±{tol_v} aralığında {toplam_bulunan} maç bulundu. En yakın 20 tanesi listeleniyor.")
     else:
         st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
@@ -210,7 +182,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     """, unsafe_allow_html=True)
 
     # 2. İY VE MS SKOR TRENDLERİ (YAN YANA, 6'ŞAR SEÇENEK - SIKIŞTIRILMIŞ)
-    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - SÜRPRİZ ÖNCELİKLİ)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET)</p>", unsafe_allow_html=True)
     
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
     ms_counts = benzerler['MS SKOR'].value_counts().head(6)
@@ -229,7 +201,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (İLK 20 MAÇ - SÜRPRİZLER ÖNDE)
+    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
     sep_line = "-" * 48
