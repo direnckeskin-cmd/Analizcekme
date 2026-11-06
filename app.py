@@ -6,36 +6,34 @@ import numpy as np
 # Sayfa Ayarları (Telefona Tam Uyumlu)
 st.set_page_config(page_title="Oran Analiz Pro AI", page_icon="⚽", layout="centered")
 
-# CSS Tasarımı (Terminal Tablo Büyütüldü & Neon Dikkat Bandı Eklendi)
+# CSS Tasarımı (Optimum Font ve Okunabilir Kontrastlı Uyarı Bandı)
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #e2e8f0; }
     .stat-card { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-family: sans-serif; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
     .neon-alert-danger {
-        background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
-        color: #ff4d4d;
-        padding: 10px;
+        background: linear-gradient(135deg, #500 0%, #200 100%);
+        color: #ffdd57;
+        padding: 9px;
         border-radius: 8px;
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: bold;
         text-align: center;
-        margin-top: 8px;
-        border: 2px solid #ff1a1a;
-        box-shadow: 0 0 12px rgba(255, 26, 26, 0.6);
-        text-shadow: 0 0 6px rgba(255, 77, 77, 0.5);
+        margin-top: 6px;
+        border: 2px solid #ff3333;
+        box-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
     }
     .neon-alert-success {
         background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
         color: #34d399;
-        padding: 10px;
+        padding: 9px;
         border-radius: 8px;
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: bold;
         text-align: center;
-        margin-top: 8px;
+        margin-top: 6px;
         border: 2px solid #10b981;
-        box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
-        text-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -264,7 +262,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (FONTI 11PX'E BÜYÜTÜLDÜ)
+    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (OPTİMİZE EDİLEN FONT: 10.5PX)
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
     sep_line = "-" * 48
@@ -312,15 +310,15 @@ if 'benzerler' in locals() and not benzerler.empty:
 
         lines.append(f"<span style='color:{renk}; font-weight:{font_weight};'>{line_str}</span>")
 
-    # Font boyutu 10px -> 11.5px yapıldı, satır aralığı (line-height) okunaklılık için 1.4'e çekildi
+    # Font boyutu telefona tam sığacak şekilde 10.5px'e ayarlandı
     terminal_box = f"""
-    <div style="background-color: #000000; padding: 10px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 11.5px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #333;">
+    <div style="background-color: #000000; padding: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 10.5px; line-height: 1.35; white-space: pre; overflow-x: auto; border: 1px solid #333;">
     {"<br>".join(lines)}
     </div>
     """
     st.markdown(terminal_box, unsafe_allow_html=True)
 
-    # NEON RENKLİ DİKKAT / UYARI BANDI
+    # YÜKSEK KONTRASTLI NEON UYARI BANDI
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
     if donus_orani >= 8 or donus_sayisi >= 2:
         uyari_mesaji = f"🚨 KRİTİK ALARM : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
