@@ -6,11 +6,37 @@ import numpy as np
 # Sayfa Ayarları (Telefona Tam Uyumlu)
 st.set_page_config(page_title="Oran Analiz Pro AI", page_icon="⚽", layout="centered")
 
-# CSS Tasarımı (Tek Ekrana Sığması İçin Kompakt Boşluklar)
+# CSS Tasarımı (Terminal Tablo Büyütüldü & Neon Dikkat Bandı Eklendi)
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #e2e8f0; }
     .stat-card { background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-family: sans-serif; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .neon-alert-danger {
+        background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+        color: #ff4d4d;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 11.5px;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 8px;
+        border: 2px solid #ff1a1a;
+        box-shadow: 0 0 12px rgba(255, 26, 26, 0.6);
+        text-shadow: 0 0 6px rgba(255, 77, 77, 0.5);
+    }
+    .neon-alert-success {
+        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+        color: #34d399;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 11.5px;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 8px;
+        border: 2px solid #10b981;
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+        text-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +107,6 @@ with col2:
 with col3:
     ms2_input = st.text_input("MS 2", value="13.30")
 with col4:
-    # Kullanıcı isterse hala manuel müdahale edebilir ama boş bırakırsa/otomatik modda çalışır
     otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
 
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=False)
@@ -109,7 +134,6 @@ if btn_analiz:
         secilen_tol = 0.02
         filtre = pd.Series(False, index=df_calc.index)
         
-        # Kademeli olarak en ideal maç havuzunu (en az 15-20 maç) bulana kadar toleransı artırır
         for t in [0.02, 0.04, 0.06, 0.08, 0.10]:
             temp_filtre = pd.Series(True, index=df_calc.index)
             if ms1_v > 0:
@@ -142,7 +166,6 @@ if btn_analiz:
         except:
             return 0, 0
 
-    # Sürpriz (1/2 veya 2/1) olanları öne taşıyan akıllı sıralama mantığı
     if not df_tolerans.empty:
         def check_surpriz_row(row):
             e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
@@ -241,7 +264,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO
+    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (FONTI 11PX'E BÜYÜTÜLDÜ)
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
     sep_line = "-" * 48
@@ -289,29 +312,22 @@ if 'benzerler' in locals() and not benzerler.empty:
 
         lines.append(f"<span style='color:{renk}; font-weight:{font_weight};'>{line_str}</span>")
 
+    # Font boyutu 10px -> 11.5px yapıldı, satır aralığı (line-height) okunaklılık için 1.4'e çekildi
     terminal_box = f"""
-    <div style="background-color: #000000; padding: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.3; white-space: pre; overflow-x: auto; border: 1px solid #222;">
+    <div style="background-color: #000000; padding: 10px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 11.5px; line-height: 1.4; white-space: pre; overflow-x: auto; border: 1px solid #333;">
     {"<br>".join(lines)}
     </div>
     """
     st.markdown(terminal_box, unsafe_allow_html=True)
 
-    # Risk Bandı
+    # NEON RENKLİ DİKKAT / UYARI BANDI
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
     if donus_orani >= 8 or donus_sayisi >= 2:
-        uyari_mesaji = f"🚨 DİKKAT : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
-
-        st.markdown(f"""
-        <div style="background-color: #7f1d1d; color: #fca5a5; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; text-align: center; margin-top: 6px; border: 1px solid #991b1b;">
-        {uyari_mesaji}
-        </div>
-        """, unsafe_allow_html=True)
+        uyari_mesaji = f"🚨 KRİTİK ALARM : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
+        st.markdown(f'<div class="neon-alert-danger">{uyari_mesaji}</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f"""
-        <div style="background-color: #064e3b; color: #6ee7b7; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; text-align: center; margin-top: 6px; border: 1px solid #065f46;">
-        ✅ Oran Havuzu İstikrarlı Seyrediyor (Ters köşe riski düşük).
-        </div>
-        """, unsafe_allow_html=True)
+        uyari_mesaji = f"✅ PİYASA DENGELİ : Oran Havuzu İstikrarlı Seyrediyor (Ters köşe riski düşük)."
+        st.markdown(f'<div class="neon-alert-success">{uyari_mesaji}</div>', unsafe_allow_html=True)
 
 else:
     if btn_analiz:
