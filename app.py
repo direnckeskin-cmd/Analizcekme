@@ -145,46 +145,42 @@ if btn_analiz:
             if temp_filtre.sum() >= 15 or t == 0.10:
                 filtre = temp_filtre
                 break
-    else:
-        secilen_tol = 0.04
-        filtre = pd.Series(True, index=df_calc.index)
-        if ms1_v > 0:
-            filtre &= (df_calc['MS1'] >= ms1_v - secilen_tol) & (df_calc['MS1'] <= ms1_v + secilen_tol)
-        if msx_v > 0:
-            filtre &= (df_calc['MSX'] >= msx_v - secilen_tol) & (df_calc['MSX'] <= msx_v + secilen_tol)
-        if ms2_v > 0:
-            filtre &= (df_calc['MS2'] >= ms2_v - secilen_tol) & (df_calc['MS2'] <= ms2_v + secilen_tol)
+        
+        df_tolerans = df_calc[filtre].copy()
 
-    df_tolerans = df_calc[filtre].copy()
+        def skor_ayir_temp(s):
+            try:
+                p = str(s).strip().split('-')
+                return int(p[0]), int(p[1])
+            except:
+                return 0, 0
 
-    def skor_ayir_temp(s):
-        try:
-            p = str(s).strip().split('-')
-            return int(p[0]), int(p[1])
-        except:
-            return 0, 0
+        if not df_tolerans.empty:
+            def check_surpriz_row(row):
+                e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
+                e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
+                h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
+                f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
+                return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
 
-    if not df_tolerans.empty:
-        def check_surpriz_row(row):
-            e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
-            e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
-            h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
-            f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
-            return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
+            df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
+            df_tolerans = df_tolerans.sort_values(by=['surpriz_flag', 'Mesafe'], ascending=[False, True]).copy()
 
-        df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
-        df_tolerans = df_tolerans.sort_values(by=['surpriz_flag', 'Mesafe'], ascending=[False, True]).copy()
-
-    if not df_tolerans.empty:
-        toplam_bulunan = len(df_tolerans)
-        if tumunu_goster:
-            benzerler = df_tolerans.copy()
-            st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
+        if not df_tolerans.empty:
+            toplam_bulunan = len(df_tolerans)
+            if tumunu_goster:
+                benzerler = df_tolerans.copy()
+                st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). Hepsi listeleniyor.")
+            else:
+                benzerler = df_tolerans.head(20).copy()
+                st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
         else:
-            benzerler = df_tolerans.head(20).copy()
-            st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
+            st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
+            benzerler = df_calc.sort_values('Mesafe').head(20).copy()
+            
     else:
-        st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
+        # AKILLI TOLERANS KAPALIYKEN: SIFIR TOLERANS, DOĞRUDAN EN YAKIN 20 MAÇ
+        st.info("🎯 Standart Mod: Sıfır tolerans ile en yakın 20 maç listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
 
 def skor_ayir(s):
@@ -243,7 +239,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     """, unsafe_allow_html=True)
 
     # 2. İY VE MS SKOR TRENDLERİ (YAN YANA, 6'ŞAR SEÇENEK - SIKIŞTIRILMIŞ)
-    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - AKILLI AI MODU)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - STANDART/AI MODU)</p>", unsafe_allow_html=True)
     
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
     ms_counts = benzerler['MS SKOR'].value_counts().head(6)
@@ -310,7 +306,6 @@ if 'benzerler' in locals() and not benzerler.empty:
 
         lines.append(f"<span style='color:{renk}; font-weight:{font_weight};'>{line_str}</span>")
 
-    # Font boyutu telefona tam sığacak şekilde 10.5px'e ayarlandı
     terminal_box = f"""
     <div style="background-color: #000000; padding: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 10.5px; line-height: 1.35; white-space: pre; overflow-x: auto; border: 1px solid #333;">
     {"<br>".join(lines)}
