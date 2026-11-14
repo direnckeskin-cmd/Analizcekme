@@ -49,9 +49,7 @@ def load_data():
         except Exception:
             df = pd.read_excel(EXCEL_PATH, header=1)
 
-        df['MS1'] = pd.to_numeric(df['MS1'], errors='coerce')
-        df['MSX'] = pd.to_numeric(df['MSX'], errors='coerce')
-        df['MS2'] = pd.to_numeric(df['MS2'], errors='coerce')
+        # Ham veriyi bozmadan saklayalım, analiz için ayrı kopyada sayıya çevireceğiz
         return df
     except Exception as e:
         return None
@@ -65,8 +63,12 @@ if df_all is None:
     st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
     st.stop()
 
-# Analiz için temizlenmiş kopya
-df_clean = df_all.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
+# Analiz motoru için sayısal kopya
+df_calc_base = df_all.copy()
+df_calc_base['MS1'] = pd.to_numeric(df_calc_base['MS1'], errors='coerce')
+df_calc_base['MSX'] = pd.to_numeric(df_calc_base['MSX'], errors='coerce')
+df_calc_base['MS2'] = pd.to_numeric(df_calc_base['MS2'], errors='coerce')
+df_clean = df_calc_base.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
 
 # Lig Filtreleme
 lig_kolonu = None
@@ -322,10 +324,10 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (TÜM VERİ SETİNDEN TARAR) ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (HAM VERİDEN ORANLARI ÇEKER) ---
 st.markdown("---")
 st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
-st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki TÜM sezonlarındaki maçlarını oranları ve skorlarıyla listelesin.")
+st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki TÜM sezonlarındaki maçlarını orijinal oranları ve skorlarıyla listelesin.")
 
 col_srch1, col_srch2 = st.columns(2)
 with col_srch1:
@@ -339,7 +341,7 @@ if btn_takim_ara:
     if not takim_a or not takim_b:
         st.warning("⚠️ Lütfen her iki takımın adını da eksiksiz girin.")
     else:
-        # FİLTRELENMEMİŞ TÜM ANA VERİ SETİ (df_all) ÜZERİNDEN VE ESNEK KELİME İLE ARAMA
+        # Ham ana veriden (df_all) arama yapıyoruz ki oranlar nan görünmesin
         kosul_gecmis = (
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
@@ -359,11 +361,19 @@ if btn_takim_ara:
                 
                 ev_sahibi = str(m['EV SAHİBİ'])
                 deplasman = str(m['DEPLASMAN'])
+                
+                # Orijinal ham tablodan oranları ve skorları alıyoruz (nan yerine temiz metin)
                 ms1_oran = m.get('MS1', '-')
                 msx_oran = m.get('MSX', '-')
                 ms2_oran = m.get('MS2', '-')
+                if pd.isna(ms1_oran) or str(ms1_oran).strip() == '': ms1_oran = "-"
+                if pd.isna(msx_oran) or str(msx_oran).strip() == '': msx_oran = "-"
+                if pd.isna(ms2_oran) or str(ms2_oran).strip() == '': ms2_oran = "-"
+
                 iy_skor = str(m.get('İY SKOR', '-'))
                 ms_skor = str(m.get('MS SKOR', '-'))
+                if iy_skor == 'nan' or not iy_skor.strip(): iy_skor = "-"
+                if ms_skor == 'nan' or not ms_skor.strip(): ms_skor = "-"
                 
                 st.markdown(f"""
                 <div style="background-color: #111827; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
