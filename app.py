@@ -325,3 +325,46 @@ if 'benzerler' in locals() and not benzerler.empty:
 else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
+
+# --- YENİ EKLENEN: İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU ---
+st.markdown("---")
+st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 Veritabanında İki Takımlı Geçmiş Maç Arama</h3>", unsafe_allow_html=True)
+st.caption("Aramak istediğin iki takımın adını (veya birer kelimesini) yaz, aralarındaki geçmiş maçları anında listelesin.")
+
+col_srch1, col_srch2 = st.columns(2)
+with col_srch1:
+    takim_a = st.text_input("1. Takım (Örn: Vasco)").strip().upper()
+with col_srch2:
+    takim_b = st.text_input("2. Takım (Örn: Chapecoense)").strip().upper()
+
+if takim_a and takim_b:
+    # Ev sahibi veya deplasman fark etmeksizin iki takımın geçtiği satırları yakala
+    kosul_gecmis = (
+        (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_a, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_b, na=False)) |
+        (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_b, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_a, na=False))
+    )
+    bulunan_gecmis = df_clean[kosul_gecmis]
+    
+    if not bulunan_gecmis.empty:
+        st.success(f"🎉 Aralarındaki {len(bulunan_gecmis)} adet geçmiş maç bulundu:")
+        for _, m in bulunan_gecmis.iterrowsliga := bulunan_gecmis.iterrows():
+            sezon_bilgi = m.get('SEZON', '')
+             lig_bilgi = m.get(lig_kolonu, '') if lig_kolonu else ''
+            ev_sahibi = m['EV SAHİBİ']
+            deplasman = m['DEPLASMAN']
+            ms1_oran = m['MS1']
+            msx_oran = m['MSX']
+            ms2_oran = m['MS2']
+            iy_skor = m['İY SKOR']
+            ms_skor = m['MS SKOR']
+            
+            st.markdown(f"""
+            <div style="background-color: #111827; border: 1px solid #1f2937; padding: 8px; border-radius: 6px; margin-bottom: 6px; font-size: 11px;">
+                <b>🏆 {lig_bilgi}</b> | <span style="color:#9ca3af;">{sezon_bilgi}</span><br>
+                <span style="color:#34d399; font-weight:bold;">⚽ {ev_sahibi} vs {deplasman}</span><br>
+                <span style="color:#f43f5e;">Oranlar: MS1: {ms1_oran} | MSX: {msx_oran} | MS2: {ms2_oran}</span><br>
+                <span style="color:#38bdf8;">Skorlar ➔ İY: {iy_skor} | MS: {ms_skor}</span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ Bu iki takım arasında eşleşen geçmiş maç bulunamadı.")
