@@ -59,20 +59,22 @@ def load_data():
         df['MS1'] = pd.to_numeric(df['MS1'], errors='coerce')
         df['MSX'] = pd.to_numeric(df['MSX'], errors='coerce')
         df['MS2'] = pd.to_numeric(df['MS2'], errors='coerce')
-        df_clean = df.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
-        df_clean.to_pickle(CACHE_PATH)
-        return df_clean
+        df.to_pickle(CACHE_PATH)
+        return df
     except Exception as e:
         return None
 
 st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 8px;'>⚽ ORAN ANALİZ VE AKILLI PATTERN MOTORU</h2>", unsafe_allow_html=True)
 
 with st.spinner("📊 Veriler yükleniyor..."):
-    df_clean = load_data()
+    df_all = load_data()
 
-if df_clean is None:
+if df_all is None:
     st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
     st.stop()
+
+# Analiz için temizlenmiş kopya
+df_clean = df_all.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
 
 # Lig Filtreleme
 lig_kolonu = None
@@ -86,14 +88,18 @@ if lig_kolonu:
     tum_ligler = sorted(df_clean[lig_kolonu].dropna().unique().tolist())
     
     st.markdown("### 🏆 Lig Filtreleme")
-    secilen_ligler = multiselect_ligler = st.multiselect(
+    secilen_ligler = st.multiselect(
         "Analize dahil etmek istediğin ligleri seç (Boş bırakırsan hepsi taranır):",
         options=tum_ligler,
         default=tum_ligler
     )
     
     if secilen_ligler:
-        df_clean = df_clean[df_clean[lig_kolonu].isin(secilen_ligler)]
+        df_analysis = df_clean[df_clean[lig_kolonu].isin(secilen_ligler)]
+    else:
+        df_analysis = df_clean
+else:
+    df_analysis = df_clean
 
 st.markdown("---")
 
@@ -119,7 +125,7 @@ if btn_analiz:
         st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Kapalılar için 0 yazın)")
         st.stop()
 
-    df_calc = df_clean.copy()
+    df_calc = df_analysis.copy()
     
     fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
     fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
@@ -324,10 +330,10 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (ÖZEL BUTONLU) ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (TÜM VERİ SETİNDEN TARAR) ---
 st.markdown("---")
 st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
-st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki tüm maçlarını oranları ve skorlarıyla listelesin.")
+st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki TÜM sezonlarındaki maçlarını oranları ve skorlarıyla listelesin.")
 
 col_srch1, col_srch2 = st.columns(2)
 with col_srch1:
@@ -335,31 +341,31 @@ with col_srch1:
 with col_srch2:
     takim_b = st.text_input("2. Takım", value="").strip().upper()
 
-# Ayrı ve bağımsız arama butonu
 btn_takim_ara = st.button("🔍 GEÇMİŞ MAÇLARI LİSTELE", use_container_width=True)
 
 if btn_takim_ara:
     if not takim_a or not takim_b:
         st.warning("⚠️ Lütfen her iki takımın adını da eksiksiz girin.")
     else:
+        # FİLTRELENMEMİŞ TÜM ANA VERİ SETİ (df_all) ÜZERİNDEN ARAMA YAPAR
         kosul_gecmis = (
-            (df_clean['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_clean['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
-            (df_clean['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_clean['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
+            (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
+            (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
         )
-        bulunan_gecmis = df_clean[kosul_gecmis]
+        bulunan_gecmis = df_all[kosul_gecmis]
         
         if not bulunan_gecmis.empty:
-            st.success(f"🎉 Aralarındaki {len(bulunan_gecmis)} adet geçmiş maç bulundu:")
+            st.success(f"🎉 Aralarındaki toplam {len(bulunan_gecmis)} adet geçmiş maç bulundu (Tüm Sezonlar):")
             for _, m in bulunan_gecmis.iterrows():
                 sezon_bilgi = str(m.get('SEZON', ''))
                 lig_bilgi = str(m.get(lig_kolonu, '')) if lig_kolonu else ''
                 ev_sahibi = str(m['EV SAHİBİ'])
                 deplasman = str(m['DEPLASMAN'])
-                ms1_oran = m['MS1']
-                msx_oran = m['MSX']
-                ms2_oran = m['MS2']
-                iy_skor = str(m['İY SKOR'])
-                ms_skor = str(m['MS SKOR'])
+                ms1_oran = m.get('MS1', '-')
+                msx_oran = m.get('MSX', '-')
+                ms2_oran = m.get('MS2', '-')
+                iy_skor = str(m.get('İY SKOR', '-'))
+                ms_skor = str(m.get('MS SKOR', '-'))
                 
                 st.markdown(f"""
                 <div style="background-color: #111827; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
