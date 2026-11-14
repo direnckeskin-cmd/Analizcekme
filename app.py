@@ -40,16 +40,9 @@ st.markdown("""
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_PATH = os.path.join(BASE_DIR, "ORAN ANALİZ TABLOSU.xlsb")
-CACHE_PATH = os.path.join(BASE_DIR, "cache_data.pkl")
 
 @st.cache_data(show_spinner=False)
 def load_data():
-    if os.path.exists(CACHE_PATH):
-        try:
-            return pd.read_pickle(CACHE_PATH)
-        except Exception:
-            pass
-    
     try:
         try:
             df = pd.read_excel(EXCEL_PATH, engine='pyxlsb', header=1)
@@ -59,14 +52,13 @@ def load_data():
         df['MS1'] = pd.to_numeric(df['MS1'], errors='coerce')
         df['MSX'] = pd.to_numeric(df['MSX'], errors='coerce')
         df['MS2'] = pd.to_numeric(df['MS2'], errors='coerce')
-        df.to_pickle(CACHE_PATH)
         return df
     except Exception as e:
         return None
 
 st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 8px;'>⚽ ORAN ANALİZ VE AKILLI PATTERN MOTORU</h2>", unsafe_allow_html=True)
 
-with st.spinner("📊 Veriler yükleniyor..."):
+with st.spinner("📊 Tüm veritabanı (geçmiş sezonlar dahil) yükleniyor..."):
     df_all = load_data()
 
 if df_all is None:
@@ -347,7 +339,7 @@ if btn_takim_ara:
     if not takim_a or not takim_b:
         st.warning("⚠️ Lütfen her iki takımın adını da eksiksiz girin.")
     else:
-        # FİLTRELENMEMİŞ TÜM ANA VERİ SETİ (df_all) ÜZERİNDEN ARAMA YAPAR
+        # FİLTRELENMEMİŞ TÜM ANA VERİ SETİ (df_all) ÜZERİNDEN VE ESNEK KELİME İLE ARAMA
         kosul_gecmis = (
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
@@ -358,7 +350,13 @@ if btn_takim_ara:
             st.success(f"🎉 Aralarındaki toplam {len(bulunan_gecmis)} adet geçmiş maç bulundu (Tüm Sezonlar):")
             for _, m in bulunan_gecmis.iterrows():
                 sezon_bilgi = str(m.get('SEZON', ''))
-                lig_bilgi = str(m.get(lig_kolonu, '')) if lig_kolonu else ''
+                lig_kolonu_bul = None
+                for col in ['ÜLKE / LİG', 'ÜLKE/LİG', 'LİG', 'LIG', 'Lig', 'Lig Adı']:
+                    if col in df_all.columns:
+                        lig_kolonu_bul = col
+                        break
+                lig_bilgi = str(m.get(lig_kolonu_bul, '')) if lig_kolonu_bul else ''
+                
                 ev_sahibi = str(m['EV SAHİBİ'])
                 deplasman = str(m['DEPLASMAN'])
                 ms1_oran = m.get('MS1', '-')
