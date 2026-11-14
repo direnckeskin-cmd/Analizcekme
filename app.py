@@ -326,7 +326,7 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- YENİ EKLENEN: İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU ---
 st.markdown("---")
 st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 Veritabanında İki Takımlı Geçmiş Maç Arama</h3>", unsafe_allow_html=True)
 st.caption("Aramak istediğin iki takımın adını (veya birer kelimesini) yaz, aralarındaki geçmiş maçları anında listelesin.")
@@ -338,7 +338,6 @@ with col_srch2:
     takim_b = st.text_input("2. Takım (Örn: Chapecoense)").strip().upper()
 
 if takim_a and takim_b:
-    # Ev sahibi veya deplasman fark etmeksizin iki takımın geçtiği satırları yakala
     kosul_gecmis = (
         (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_a, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_b, na=False)) |
         (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_b, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_a, na=False))
@@ -347,9 +346,9 @@ if takim_a and takim_b:
     
     if not bulunan_gecmis.empty:
         st.success(f"🎉 Aralarındaki {len(bulunan_gecmis)} adet geçmiş maç bulundu:")
-        for _, m in bulunan_gecmis.iterrowsliga := bulunan_gecmis.iterrows():
+        for _, m in bulunan_gecmis.iterrows():
             sezon_bilgi = m.get('SEZON', '')
-             lig_bilgi = m.get(lig_kolonu, '') if lig_kolonu else ''
+            lig_bilgi = m.get(lig_kolonu, '') if lig_kolonu else ''
             ev_sahibi = m['EV SAHİBİ']
             deplasman = m['DEPLASMAN']
             ms1_oran = m['MS1']
