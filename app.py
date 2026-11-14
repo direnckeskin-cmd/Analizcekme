@@ -179,7 +179,6 @@ if btn_analiz:
             benzerler = df_calc.sort_values('Mesafe').head(20).copy()
             
     else:
-        # AKILLI TOLERANS KAPALIYKEN: SIFIR TOLERANS (Doğrudan Öklid mesafesine göre en yakın 20 maç)
         st.info("🎯 Standart Mod: Sıfır tolerans (doğrudan en yakın mesafe) ile en yakın 20 maç listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
 
@@ -221,7 +220,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     her_iki_yari_kg_pct = round(benzerler['her_iki_yari_kg_var'].mean() * 100)
     kg_v = round(benzerler['kg_var'].mean() * 100)
 
-    # 1. ÜST İSTATİSTİK KARTI (2'Lİ YAN YANA - SIKIŞTIRILMIŞ)
+    # 1. ÜST İSTATİSTİK KARTI
     st.markdown(f"""
     <div style="display: flex; gap: 6px; margin-bottom: 4px;">
         <div class="stat-card" style="flex: 1; margin-bottom: 0;">
@@ -238,7 +237,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. İY VE MS SKOR TRENDLERİ (YAN YANA, 6'ŞAR SEÇENEK - SIKIŞTIRILMIŞ)
+    # 2. İY VE MS SKOR TRENDLERİ
     st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - STANDART/AI MODU)</p>", unsafe_allow_html=True)
     
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
@@ -258,7 +257,7 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. KESİNLİKLE KAYMAYAN TERTEMİZ TERMINAL TABLO (OPTİMİZE EDİLEN FONT: 10.5PX)
+    # 3. TERMINAL TABLO
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
     sep_line = "-" * 48
@@ -313,7 +312,6 @@ if 'benzerler' in locals() and not benzerler.empty:
     """
     st.markdown(terminal_box, unsafe_allow_html=True)
 
-    # YÜKSEK KONTRASTLI NEON UYARI BANDI
     donus_orani = round((donus_sayisi / toplam_mac) * 100) if toplam_mac > 0 else 0
     if donus_orani >= 8 or donus_sayisi >= 2:
         uyari_mesaji = f"🚨 KRİTİK ALARM : Bu Oran Havuzu %{donus_orani} Oranında ({donus_sayisi} Maç) Maç İçi Ters Köşe (1/2 veya 2/1) Potansiyeli Taşıyor!"
@@ -326,44 +324,45 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (GÜNCELLENDİ) ---
 st.markdown("---")
-st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 Veritabanında İki Takımlı Geçmiş Maç Arama</h3>", unsafe_allow_html=True)
-st.caption("Aramak istediğin iki takımın adını (veya birer kelimesini) yaz, aralarındaki geçmiş maçları anında listelesin.")
+st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
+st.caption("Aramak istediğin iki takımın adını yaz (Örn: Vasco ve Chapecoense), geçmişteki tüm maçlarını oranları ve skorlarıyla listelesin.")
 
 col_srch1, col_srch2 = st.columns(2)
 with col_srch1:
-    takim_a = st.text_input("1. Takım (Örn: Vasco)").strip().upper()
+    takim_a = st.text_input("1. Takım", value="").strip().upper()
 with col_srch2:
-    takim_b = st.text_input("2. Takım (Örn: Chapecoense)").strip().upper()
+    takim_b = st.text_input("2. Takım", value="").strip().upper()
 
 if takim_a and takim_b:
+    # Kesin ve esnek eşleşme: Ev sahibi veya deplasman fark etmeksizin iki takımın adı da satırda geçmeli
     kosul_gecmis = (
-        (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_a, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_b, na=False)) |
-        (df_clean['EV SAHİBİ'].str.upper().str.contains(takim_b, na=False) & df_clean['DEPLASMAN'].str.upper().str.contains(takim_a, na=False))
+        (df_clean['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_clean['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
+        (df_clean['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_clean['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
     )
     bulunan_gecmis = df_clean[kosul_gecmis]
     
     if not bulunan_gecmis.empty:
         st.success(f"🎉 Aralarındaki {len(bulunan_gecmis)} adet geçmiş maç bulundu:")
         for _, m in bulunan_gecmis.iterrows():
-            sezon_bilgi = m.get('SEZON', '')
-            lig_bilgi = m.get(lig_kolonu, '') if lig_kolonu else ''
-            ev_sahibi = m['EV SAHİBİ']
-            deplasman = m['DEPLASMAN']
+            sezon_bilgi = str(m.get('SEZON', ''))
+            lig_bilgi = str(m.get(lig_kolonu, '')) if lig_kolonu else ''
+            ev_sahibi = str(m['EV SAHİBİ'])
+            deplasman = str(m['DEPLASMAN'])
             ms1_oran = m['MS1']
             msx_oran = m['MSX']
             ms2_oran = m['MS2']
-            iy_skor = m['İY SKOR']
-            ms_skor = m['MS SKOR']
+            iy_skor = str(m['İY SKOR'])
+            ms_skor = str(m['MS SKOR'])
             
             st.markdown(f"""
-            <div style="background-color: #111827; border: 1px solid #1f2937; padding: 8px; border-radius: 6px; margin-bottom: 6px; font-size: 11px;">
-                <b>🏆 {lig_bilgi}</b> | <span style="color:#9ca3af;">{sezon_bilgi}</span><br>
-                <span style="color:#34d399; font-weight:bold;">⚽ {ev_sahibi} vs {deplasman}</span><br>
-                <span style="color:#f43f5e;">Oranlar: MS1: {ms1_oran} | MSX: {msx_oran} | MS2: {ms2_oran}</span><br>
-                <span style="color:#38bdf8;">Skorlar ➔ İY: {iy_skor} | MS: {ms_skor}</span>
+            <div style="background-color: #111827; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
+                <b>🏆 Lig/Sezon: {lig_bilgi}</b> | <span style="color:#9ca3af;">{sezon_bilgi}</span><br>
+                <span style="color:#34d399; font-weight:bold; font-size:12px;">⚽ {ev_sahibi} vs {deplasman}</span><br>
+                <span style="color:#f43f5e; font-weight:bold;">Oranlar ➔ MS1: {ms1_oran} | MSX: {msx_oran} | MS2: {ms2_oran}</span><br>
+                <span style="color:#38bdf8; font-weight:bold;">Skorlar ➔ İlk Yarı (İY): {iy_skor} | Maç Sonu (MS): {ms_skor}</span>
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.warning("⚠️ Bu iki takım arasında eşleşen geçmiş maç bulunamadı.")
+        st.warning("⚠️ Bu iki takım arasında veritabanında eşleşen geçmiş maç bulunamadı. (Takım isimlerinin tam yazılışını kontrol edebilirsin)")
