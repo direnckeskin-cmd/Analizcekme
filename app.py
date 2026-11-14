@@ -132,7 +132,7 @@ if btn_analiz:
         secilen_tol = 0.02
         filtre = pd.Series(False, index=df_calc.index)
         
-        for t in [0.02, 0.04, 0.06, 0.08, 0.10]:
+        for t in [0.01, 0.02, 0.03, 0.05, 0.08, 0.12, 0.20]:
             temp_filtre = pd.Series(True, index=df_calc.index)
             if ms1_v > 0:
                 temp_filtre &= (df_calc['MS1'] >= ms1_v - t) & (df_calc['MS1'] <= ms1_v + t)
@@ -142,7 +142,7 @@ if btn_analiz:
                 temp_filtre &= (df_calc['MS2'] >= ms2_v - t) & (df_calc['MS2'] <= ms2_v + t)
             
             secilen_tol = t
-            if temp_filtre.sum() >= 15 or t == 0.10:
+            if temp_filtre.sum() >= 20 or t == 0.20:
                 filtre = temp_filtre
                 break
         
@@ -175,12 +175,12 @@ if btn_analiz:
                 benzerler = df_tolerans.head(20).copy()
                 st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
         else:
-            st.warning(f"⚠️ Tam eşleşme bulunamadı. En yakın maçlar listeleniyor.")
+            st.warning(f"⚠️ Bu aralıkta tam eşleşme bulunamadı, en yakın maçlar listeleniyor.")
             benzerler = df_calc.sort_values('Mesafe').head(20).copy()
             
     else:
-        # AKILLI TOLERANS KAPALIYKEN: SIFIR TOLERANS, DOĞRUDAN EN YAKIN 20 MAÇ
-        st.info("🎯 Standart Mod: Sıfır tolerans ile en yakın 20 maç listeleniyor.")
+        # AKILLI TOLERANS KAPALIYKEN: SIFIR TOLERANS (Doğrudan Öklid mesafesine göre en yakın 20 maç)
+        st.info("🎯 Standart Mod: Sıfır tolerans (doğrudan en yakın mesafe) ile en yakın 20 maç listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
 
 def skor_ayir(s):
