@@ -48,8 +48,6 @@ def load_data():
             df = pd.read_excel(EXCEL_PATH, engine='pyxlsb', header=1)
         except Exception:
             df = pd.read_excel(EXCEL_PATH, header=1)
-
-        # Ham veriyi bozmadan saklayalım, analiz için ayrı kopyada sayıya çevireceğiz
         return df
     except Exception as e:
         return None
@@ -324,9 +322,9 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (HAM VERİDEN ORANLARI ÇEKER) ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (BÜYÜK FONT & ALEV EFEKTİ) ---
 st.markdown("---")
-st.markdown("<h3 style='color: #38bdf8; font-size: 15px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color: #38bdf8; font-size: 16px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
 st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki TÜM sezonlarındaki maçlarını orijinal oranları ve skorlarıyla listelesin.")
 
 col_srch1, col_srch2 = st.columns(2)
@@ -341,7 +339,6 @@ if btn_takim_ara:
     if not takim_a or not takim_b:
         st.warning("⚠️ Lütfen her iki takımın adını da eksiksiz girin.")
     else:
-        # Ham ana veriden (df_all) arama yapıyoruz ki oranlar nan görünmesin
         kosul_gecmis = (
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_a, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_b, na=False)) |
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
@@ -362,7 +359,6 @@ if btn_takim_ara:
                 ev_sahibi = str(m['EV SAHİBİ'])
                 deplasman = str(m['DEPLASMAN'])
                 
-                # Orijinal ham tablodan oranları ve skorları alıyoruz (nan yerine temiz metin)
                 ms1_oran = m.get('MS1', '-')
                 msx_oran = m.get('MSX', '-')
                 ms2_oran = m.get('MS2', '-')
@@ -370,17 +366,54 @@ if btn_takim_ara:
                 if pd.isna(msx_oran) or str(msx_oran).strip() == '': msx_oran = "-"
                 if pd.isna(ms2_oran) or str(ms2_oran).strip() == '': ms2_oran = "-"
 
-                iy_skor = str(m.get('İY SKOR', '-'))
-                ms_skor = str(m.get('MS SKOR', '-'))
-                if iy_skor == 'nan' or not iy_skor.strip(): iy_skor = "-"
-                if ms_skor == 'nan' or not ms_skor.strip(): ms_skor = "-"
+                iy_skor_str = str(m.get('İY SKOR', '-'))
+                ms_skor_str = str(m.get('MS SKOR', '-'))
+                if iy_skor_str == 'nan' or not iy_skor_str.strip(): iy_skor_str = "0-0"
+                if ms_skor_str == 'nan' or not ms_skor_str.strip(): ms_skor_str = "0-0"
+
+                # Sürpriz ve Gol Kontrolü için Skorları Ayır
+                try:
+                    iy_p = iy_skor_str.strip().split('-')
+                    ms_p = ms_skor_str.strip().split('-')
+                    iy_e, iy_d = int(iy_p[0]), int(iy_p[1])
+                    ms_e, ms_d = int(ms_p[0]), int(ms_p[1])
+                except:
+                    iy_e, iy_d, ms_e, ms_d = 0, 0, 0, 0
+
+                # Maç İçi İy/Ms Durumu (1/2, 2/1, 1/X, 2/X vb.)
+                ht_val = '1' if iy_e > iy_d else ('2' if iy_d > iy_e else 'X')
+                ft_val = '1' if ms_e > ms_d else ('2' if ms_d > ms_e else 'X')
+                ht_ft_str = f"{ht_val}/{ft_val}"
+                ms_toplam_gol = ms_e + ms_d
+
+                # Alev (Sürpriz) Kriterleri: 1/2, 2/1, 1/X, 2/X veya 6+ Gol
+                is_alev = False
+                alev_etiketleri = []
+
+                if ht_ft_str in ['1/2', '2/1']:
+                    is_alev = True
+                    alev_etiketleri.append(f"Ters Köşe ({ht_ft_str})")
+                elif ht_ft_str == '1/X':
+                    is_alev = True
+                    alev_etiketleri.append("1/X Sürpriz")
+                elif ht_ft_str == '2/X':
+                    is_alev = True
+                    alev_etiketleri.append("2/X Sürpriz")
                 
+                # Çifte Şans / Maç Sonu Durumları (Örn: Deplasman kazanır 2X vb. istendiyse veya 6+ gol)
+                if ms_toplam_gol >= 6:
+                    is_alev = True
+                    alev_etiketleri.append(f"{ms_toplam_gol} Gol (6+)")
+
+                alev_icon = " 🔥" if is_alev else ""
+                etiket_yazi = f" — <span style='color:#f59e0b; font-weight:bold;'>{' | '.join(alev_etiketleri)}</span>" if is_alev else ""
+
                 st.markdown(f"""
-                <div style="background-color: #111827; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
-                    <b>🏆 Lig/Sezon: {lig_bilgi}</b> | <span style="color:#9ca3af;">{sezon_bilgi}</span><br>
-                    <span style="color:#34d399; font-weight:bold; font-size:12px;">⚽ {ev_sahibi} vs {deplasman}</span><br>
-                    <span style="color:#f43f5e; font-weight:bold;">Oranlar ➔ MS1: {ms1_oran} | MSX: {msx_oran} | MS2: {ms2_oran}</span><br>
-                    <span style="color:#38bdf8; font-weight:bold;">Skorlar ➔ İlk Yarı (İY): {iy_skor} | Maç Sonu (MS): {ms_skor}</span>
+                <div style="background-color: #111827; border: 2px solid {'#f59e0b' if is_alev else '#1f2937'}; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px;">
+                    <b style="color: #38bdf8; font-size: 13px;">🏆 Lig/Sezon: {lig_bilgi}</b> | <span style="color:#9ca3af;">{sezon_bilgi}</span><br>
+                    <span style="color:#34d399; font-weight:bold; font-size:15px;">⚽ {ev_sahibi} vs {deplasman}</span>{alev_icon}{etiket_yazi}<br>
+                    <span style="color:#f43f5e; font-weight:bold; font-size:12px;">Oranlar ➔ MS1: {ms1_oran} | MSX: {msx_oran} | MS2: {ms2_oran}</span><br>
+                    <span style="color:#e2e8f0; font-weight:bold; font-size:12px;">Skorlar ➔ İlk Yarı (İY): {iy_skor_str} | Maç Sonu (MS): {ms_skor_str} (Toplam: {ms_toplam_gol} Gol)</span>
                 </div>
                 """, unsafe_allow_html=True)
         else:
