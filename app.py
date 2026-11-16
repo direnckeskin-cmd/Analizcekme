@@ -61,11 +61,21 @@ if df_all is None:
     st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
     st.stop()
 
-# Analiz motoru için sayısal kopya
+# Analiz motoru için sayısal kopya (MS ve İY oran sütunları ekleniyor)
 df_calc_base = df_all.copy()
 df_calc_base['MS1'] = pd.to_numeric(df_calc_base['MS1'], errors='coerce')
 df_calc_base['MSX'] = pd.to_numeric(df_calc_base['MSX'], errors='coerce')
 df_calc_base['MS2'] = pd.to_numeric(df_calc_base['MS2'], errors='coerce')
+
+# Excel'deki İY oran sütun adlarını otomatik bulma
+iy1_col = next((c for c in df_calc_base.columns if 'İY1' in str(c).upper() or 'IY1' in str(c).upper()), None)
+iyx_col = next((c for c in df_calc_base.columns if 'İYX' in str(c).upper() or 'IYX' in str(c).upper() or 'İY X' in str(c).upper()), None)
+iy2_col = next((c for c in df_calc_base.columns if 'İY2' in str(c).upper() or 'IY2' in str(c).upper()), None)
+
+if iy1_col: df_calc_base[iy1_col] = pd.to_numeric(df_calc_base[iy1_col], errors='coerce')
+if iyx_col: df_calc_base[iyx_col] = pd.to_numeric(df_calc_base[iyx_col], errors='coerce')
+if iy2_col: df_calc_base[iy2_col] = pd.to_numeric(df_calc_base[iy2_col], errors='coerce')
+
 df_clean = df_calc_base.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
 
 # Lig Filtreleme
@@ -95,17 +105,27 @@ else:
 
 st.markdown("---")
 
-col1, col2, col3, col4 = st.columns(4)
+# ORAN GİRİŞLERİ (Artık İY oranları da var!)
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>🎯 MAÇ SONUCU (MS) ORANLARI</p>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns(3)
 with col1:
-    ms1_input = st.text_input("MS 1", value="0")
+    ms1_input = st.text_input("MS 1", value="1.22")
 with col2:
-    msx_input = st.text_input("MS X", value="7.29")
+    msx_input = st.text_input("MS X", value="4.18")
 with col3:
-    ms2_input = st.text_input("MS 2", value="13.30")
-with col4:
-    otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
+    ms2_input = st.text_input("MS 2", value="7.58")
 
-tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=False)
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin: 6px 0 4px 0;'>⚡ İLK YARI (İY) ORANLARI (Excel Eşitleme)</p>", unsafe_allow_html=True)
+col4, col5, col6 = st.columns(3)
+with col4:
+    iy1_input = st.text_input("İY 1", value="1.68")
+with col5:
+    iyx_input = st.text_input("İY X", value="0")
+with col6:
+    iy2_input = st.text_input("İY 2", value="0")
+
+otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
+tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=True)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
 
 if btn_analiz:
@@ -113,17 +133,25 @@ if btn_analiz:
         ms1_v = float(ms1_input.strip().replace(',', '.'))
         msx_v = float(msx_input.strip().replace(',', '.'))
         ms2_v = float(ms2_input.strip().replace(',', '.'))
+        iy1_v = float(iy1_input.strip().replace(',', '.')) if iy1_input.strip() else 0.0
+        iyx_v = float(iyx_input.strip().replace(',', '.')) if iyx_input.strip() else 0.0
+        iy2_v = float(iy2_input.strip().replace(',', '.')) if iy2_input.strip() else 0.0
     except ValueError:
-        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Kapalılar için 0 yazın)")
+        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Boşlar için 0 yazın)")
         st.stop()
 
     df_calc = df_analysis.copy()
     
+    # Mesafe Hesaplama (Hem MS hem İY oranları dahil ediliyor)
     fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
     fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
     fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
     
-    df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2)
+    fark_iy1 = (df_calc[iy1_col] - iy1_v)**2 if (iy1_col and iy1_v > 0) else 0
+    fark_iyx = (df_calc[iyx_col] - iyx_v)**2 if (iyx_col and iyx_v > 0) else 0
+    fark_iy2 = (df_calc[iy2_col] - iy2_v)**2 if (iy2_col and iy2_v > 0) else 0
+    
+    df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2 + fark_iy1 + fark_iyx + fark_iy2)
 
     # AKILLI TOLERANS ALGORİTMASI (AI MODU)
     if otomatik_mod:
@@ -138,6 +166,8 @@ if btn_analiz:
                 temp_filtre &= (df_calc['MSX'] >= msx_v - t) & (df_calc['MSX'] <= msx_v + t)
             if ms2_v > 0:
                 temp_filtre &= (df_calc['MS2'] >= ms2_v - t) & (df_calc['MS2'] <= ms2_v + t)
+            if iy1_col and iy1_v > 0:
+                temp_filtre &= (df_calc[iy1_col] >= iy1_v - t) & (df_calc[iy1_col] <= iy1_v + t)
             
             secilen_tol = t
             if temp_filtre.sum() >= 20 or t == 0.20:
@@ -158,7 +188,7 @@ if btn_analiz:
                 e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
                 e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
                 h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
-                f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
+                f = '1' if e_ms > d_ms else ('2' if e_ms > d_ms else 'X')
                 return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
 
             df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
@@ -371,7 +401,6 @@ if btn_takim_ara:
                 if iy_skor_str == 'nan' or not iy_skor_str.strip(): iy_skor_str = "0-0"
                 if ms_skor_str == 'nan' or not ms_skor_str.strip(): ms_skor_str = "0-0"
 
-                # Sürpriz ve Gol Kontrolü için Skorları Ayır
                 try:
                     iy_p = iy_skor_str.strip().split('-')
                     ms_p = ms_skor_str.strip().split('-')
@@ -380,13 +409,11 @@ if btn_takim_ara:
                 except:
                     iy_e, iy_d, ms_e, ms_d = 0, 0, 0, 0
 
-                # Maç İçi İy/Ms Durumu (1/2, 2/1, 1/X, 2/X vb.)
                 ht_val = '1' if iy_e > iy_d else ('2' if iy_d > iy_e else 'X')
                 ft_val = '1' if ms_e > ms_d else ('2' if ms_d > ms_e else 'X')
                 ht_ft_str = f"{ht_val}/{ft_val}"
                 ms_toplam_gol = ms_e + ms_d
 
-                # Alev (Sürpriz) Kriterleri: 1/2, 2/1, 1/X, 2/X veya 6+ Gol
                 is_alev = False
                 alev_etiketleri = []
 
@@ -400,7 +427,6 @@ if btn_takim_ara:
                     is_alev = True
                     alev_etiketleri.append("2/X Sürpriz")
                 
-                # Çifte Şans / Maç Sonu Durumları (Örn: Deplasman kazanır 2X vb. istendiyse veya 6+ gol)
                 if ms_toplam_gol >= 6:
                     is_alev = True
                     alev_etiketleri.append(f"{ms_toplam_gol} Gol (6+)")
