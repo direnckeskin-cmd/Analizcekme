@@ -61,7 +61,7 @@ if df_all is None:
     st.error("❌ Excel verisi yüklenemedi! Lütfen dosya yolunu kontrol edin.")
     st.stop()
 
-# Analiz motoru için sayısal kopya (MS ve İY oran sütunları ekleniyor)
+# Analiz motoru için sayısal kopya
 df_calc_base = df_all.copy()
 df_calc_base['MS1'] = pd.to_numeric(df_calc_base['MS1'], errors='coerce')
 df_calc_base['MSX'] = pd.to_numeric(df_calc_base['MSX'], errors='coerce')
@@ -105,24 +105,24 @@ else:
 
 st.markdown("---")
 
-# ORAN GİRİŞLERİ (Artık İY oranları da var!)
+# ORAN GİRİŞLERİ (Boş bırakılanlar otomatik es geçilir)
 st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>🎯 MAÇ SONUCU (MS) ORANLARI</p>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
-    ms1_input = st.text_input("MS 1", value="1.22")
+    ms1_input = st.text_input("MS 1", value="1.67")
 with col2:
-    msx_input = st.text_input("MS X", value="4.18")
+    msx_input = st.text_input("MS X", value="3.03")
 with col3:
-    ms2_input = st.text_input("MS 2", value="7.58")
+    ms2_input = st.text_input("MS 2", value="3.91")
 
-st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin: 6px 0 4px 0;'>⚡ İLK YARI (İY) ORANLARI (Excel Eşitleme)</p>", unsafe_allow_html=True)
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin: 6px 0 4px 0;'>⚡ İLK YARI (İY) ORANLARI (Boş bırakılabilir)</p>", unsafe_allow_html=True)
 col4, col5, col6 = st.columns(3)
 with col4:
-    iy1_input = st.text_input("İY 1", value="1.68")
+    iy1_input = st.text_input("İY 1", value="2.28")
 with col5:
-    iyx_input = st.text_input("İY X", value="0")
+    iyx_input = st.text_input("İY X", value="1.88")
 with col6:
-    iy2_input = st.text_input("İY 2", value="0")
+    iy2_input = st.text_input("İY 2", value="")
 
 otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=True)
@@ -130,19 +130,19 @@ btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primar
 
 if btn_analiz:
     try:
-        ms1_v = float(ms1_input.strip().replace(',', '.'))
-        msx_v = float(msx_input.strip().replace(',', '.'))
-        ms2_v = float(ms2_input.strip().replace(',', '.'))
+        ms1_v = float(ms1_input.strip().replace(',', '.')) if ms1_input.strip() else 0.0
+        msx_v = float(msx_input.strip().replace(',', '.')) if msx_input.strip() else 0.0
+        ms2_v = float(ms2_input.strip().replace(',', '.')) if ms2_input.strip() else 0.0
         iy1_v = float(iy1_input.strip().replace(',', '.')) if iy1_input.strip() else 0.0
         iyx_v = float(iyx_input.strip().replace(',', '.')) if iyx_input.strip() else 0.0
         iy2_v = float(iy2_input.strip().replace(',', '.')) if iy2_input.strip() else 0.0
     except ValueError:
-        st.error("Lütfen tüm değerleri geçerli sayı olarak girin! (Boşlar için 0 yazın)")
+        st.error("Lütfen tüm değerleri geçerli sayı olarak girin!")
         st.stop()
 
     df_calc = df_analysis.copy()
     
-    # Mesafe Hesaplama (Hem MS hem İY oranları dahil ediliyor)
+    # Mesafe Hesaplama (Sadece dolu girilen oranlar hesaba katılır, boşlar atlanır)
     fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
     fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
     fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
@@ -153,10 +153,10 @@ if btn_analiz:
     
     df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2 + fark_iy1 + fark_iyx + fark_iy2)
 
-    # AKILLI TOLERANS ALGORİTMASI (AI MODU)
+    # AKILLI TOLERANS ALGORİTMASI (AI MODU - Sadece dolu kutuları filtreler)
     if otomatik_mod:
         secilen_tol = 0.02
-        filtre = pd.Series(False, index=df_calc.index)
+        filtre = pd.Series(True, index=df_calc.index)
         
         for t in [0.01, 0.02, 0.03, 0.05, 0.08, 0.12, 0.20]:
             temp_filtre = pd.Series(True, index=df_calc.index)
@@ -168,6 +168,10 @@ if btn_analiz:
                 temp_filtre &= (df_calc['MS2'] >= ms2_v - t) & (df_calc['MS2'] <= ms2_v + t)
             if iy1_col and iy1_v > 0:
                 temp_filtre &= (df_calc[iy1_col] >= iy1_v - t) & (df_calc[iy1_col] <= iy1_v + t)
+            if iyx_col and iyx_v > 0:
+                temp_filtre &= (df_calc[iyx_col] >= iyx_v - t) & (df_calc[iyx_col] <= iyx_v + t)
+            if iy2_col and iy2_v > 0:
+                temp_filtre &= (df_calc[iy2_col] >= iy2_v - t) & (df_calc[iy2_col] <= iy2_v + t)
             
             secilen_tol = t
             if temp_filtre.sum() >= 20 or t == 0.20:
@@ -188,7 +192,7 @@ if btn_analiz:
                 e_iy, d_iy = skor_ayir_temp(row['İY SKOR'])
                 e_ms, d_ms = skor_ayir_temp(row['MS SKOR'])
                 h = '1' if e_iy > d_iy else ('2' if d_iy > e_iy else 'X')
-                f = '1' if e_ms > d_ms else ('2' if e_ms > d_ms else 'X')
+                f = '1' if e_ms > d_ms else ('2' if d_ms > e_ms else 'X')
                 return 1 if f"{h}/{f}" in ['1/2', '2/1'] else 0
 
             df_tolerans['surpriz_flag'] = df_tolerans.apply(check_surpriz_row, axis=1)
