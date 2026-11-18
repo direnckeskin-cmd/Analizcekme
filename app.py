@@ -105,7 +105,11 @@ else:
 
 st.markdown("---")
 
-# ORAN GİRİŞLERİ (Boş bırakılanlar otomatik es geçilir)
+# MAÇ ADI / KÜNYE GİRİŞİ (Ekran Görüntüsü İçin)
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>📌 ANALİZ EDİLEN MAÇ (Ekran Görüntüsü Başlığı)</p>", unsafe_allow_html=True)
+mac_adi_input = st.text_input("Maç Adını Yazın (Örn: Iğdır FK - Ümraniyespor)", value="", placeholder="Maç adını buraya yazabilirsiniz...")
+
+# ORAN GİRİŞLERİ
 st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>🎯 MAÇ SONUCU (MS) ORANLARI</p>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -142,7 +146,6 @@ if btn_analiz:
 
     df_calc = df_analysis.copy()
     
-    # Mesafe Hesaplama (Sadece dolu girilen oranlar hesaba katılır, boşlar atlanır)
     fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
     fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
     fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
@@ -153,7 +156,6 @@ if btn_analiz:
     
     df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2 + fark_iy1 + fark_iyx + fark_iy2)
 
-    # AKILLI TOLERANS ALGORİTMASI (AI MODU - Sadece dolu kutuları filtreler)
     if otomatik_mod:
         secilen_tol = 0.02
         filtre = pd.Series(True, index=df_calc.index)
@@ -289,6 +291,14 @@ if 'benzerler' in locals() and not benzerler.empty:
     </div>
     """, unsafe_allow_html=True)
 
+    # EĞER MAÇ ADI YAZILDIYSA TABLONUN ÜSTÜNE ŞIK BİR BAŞLIK BASALIM
+    if mac_adi_input.strip():
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #0369a1 0%, #0f172a 100%); color: #38bdf8; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 6px; border: 1px solid #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);">
+            📌 ANALİZ EDİLEN MAÇ : {mac_adi_input.strip().upper()}
+        </div>
+        """, unsafe_allow_html=True)
+
     # 3. TERMINAL TABLO
     lines = []
     header_line = f"{'EV - DEPLASMAN':<22} | {'İY':<4} | {'MS':<4} | {'HT/FT'}"
@@ -356,7 +366,7 @@ else:
     if btn_analiz:
         st.warning("Lütfen analiz için geçerli oranlar girin.")
 
-# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU (BÜYÜK FONT & ALEV EFEKTİ) ---
+# --- İKİ TAKIMLI AKILLI GEÇMİŞ MAÇ ARAMA MOTORU ---
 st.markdown("---")
 st.markdown("<h3 style='color: #38bdf8; font-size: 16px;'>🔍 İki Takım Arasındaki Geçmiş Maçları Listele</h3>", unsafe_allow_html=True)
 st.caption("Aramak istediğin iki takımın adını yaz ve aşağıdaki butona bas, geçmişteki TÜM sezonlarındaki maçlarını orijinal oranları ve skorlarıyla listelesin.")
