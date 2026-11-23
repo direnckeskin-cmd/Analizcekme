@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -41,6 +42,17 @@ st.markdown("""
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_PATH = os.path.join(BASE_DIR, "ORAN ANALİZ TABLOSU.xlsb")
 
+
+def find_odd_column(columns, patterns):
+    """Sütun adlarını normalize edip verilen desenlere uyan ilk sütunu döndürür."""
+    for col in columns:
+        norm = re.sub(r'[^A-Z0-9]', '', str(col).upper().replace('İ', 'I'))
+        for pat in patterns:
+            if pat in norm:
+                return col
+    return None
+
+
 @st.cache_data(show_spinner=False)
 def load_data():
     try:
@@ -49,8 +61,9 @@ def load_data():
         except Exception:
             df = pd.read_excel(EXCEL_PATH, header=1)
         return df
-    except Exception as e:
+    except Exception:
         return None
+
 
 st.markdown("<h2 style='text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 8px;'>⚽ ORAN ANALİZ VE AKILLI PATTERN MOTORU</h2>", unsafe_allow_html=True)
 
@@ -68,13 +81,18 @@ df_calc_base['MSX'] = pd.to_numeric(df_calc_base['MSX'], errors='coerce')
 df_calc_base['MS2'] = pd.to_numeric(df_calc_base['MS2'], errors='coerce')
 
 # Excel'deki İY oran sütun adlarını otomatik bulma
-iy1_col = next((c for c in df_calc_base.columns if 'İY1' in str(c).upper() or 'IY1' in str(c).upper()), None)
-iyx_col = next((c for c in df_calc_base.columns if 'İYX' in str(c).upper() or 'IYX' in str(c).upper() or 'İY X' in str(c).upper()), None)
-iy2_col = next((c for c in df_calc_base.columns if 'İY2' in str(c).upper() or 'IY2' in str(c).upper()), None)
+iy1_col = find_odd_column(df_calc_base.columns, ['IY1'])
+iyx_col = find_odd_column(df_calc_base.columns, ['IYX'])
+iy2_col = find_odd_column(df_calc_base.columns, ['IY2'])
 
-if iy1_col: df_calc_base[iy1_col] = pd.to_numeric(df_calc_base[iy1_col], errors='coerce')
-if iyx_col: df_calc_base[iyx_col] = pd.to_numeric(df_calc_base[iyx_col], errors='coerce')
-if iy2_col: df_calc_base[iy2_col] = pd.to_numeric(df_calc_base[iy2_col], errors='coerce')
+# Excel'deki 2. Yarı (2Y) oran sütun adlarını otomatik bulma
+y2_1_col = find_odd_column(df_calc_base.columns, ['2Y1', '2IY1', 'IY21'])
+y2_x_col = find_odd_column(df_calc_base.columns, ['2YX', '2IYX', 'IY2X'])
+y2_2_col = find_odd_column(df_calc_base.columns, ['2Y2', '2IY2', 'IY22'])
+
+for c in [iy1_col, iyx_col, iy2_col, y2_1_col, y2_x_col, y2_2_col]:
+    if c:
+        df_calc_base[c] = pd.to_numeric(df_calc_base[c], errors='coerce')
 
 df_clean = df_calc_base.dropna(subset=['MS1', 'MSX', 'MS2', 'İY SKOR', 'MS SKOR']).copy()
 
@@ -88,14 +106,14 @@ for col in ['ÜLKE / LİG', 'ÜLKE/LİG', 'LİG', 'LIG', 'Lig', 'Lig Adı']:
 if lig_kolonu:
     df_clean[lig_kolonu] = df_clean[lig_kolonu].astype(str).str.strip()
     tum_ligler = sorted(df_clean[lig_kolonu].dropna().unique().tolist())
-    
+
     st.markdown("### 🏆 Lig Filtreleme")
     secilen_ligler = st.multiselect(
         "Analize dahil etmek istediğin ligleri seç (Boş bırakırsan hepsi taranır):",
         options=tum_ligler,
         default=tum_ligler
     )
-    
+
     if secilen_ligler:
         df_analysis = df_clean[df_clean[lig_kolonu].isin(secilen_ligler)]
     else:
@@ -109,7 +127,7 @@ st.markdown("---")
 st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>📌 ANALİZ EDİLEN MAÇ (Ekran Görüntüsü Başlığı)</p>", unsafe_allow_html=True)
 mac_adi_input = st.text_input("Maç Adını Yazın (Örn: Iğdır FK - Ümraniyespor)", value="", placeholder="Maç adını buraya yazabilirsiniz...")
 
-# ORAN GİRİŞLERİ
+# ORAN GİRİŞLERİ (Boş bırakılanlar otomatik es geçilir)
 st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;'>🎯 MAÇ SONUCU (MS) ORANLARI</p>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -128,6 +146,15 @@ with col5:
 with col6:
     iy2_input = st.text_input("İY 2", value="")
 
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin: 6px 0 4px 0;'>🔥 İKİNCİ YARI (2Y) ORANLARI (Boş bırakılabilir)</p>", unsafe_allow_html=True)
+col7, col8, col9 = st.columns(3)
+with col7:
+    y2_1_input = st.text_input("2Y 1", value="")
+with col8:
+    y2_x_input = st.text_input("2Y X", value="")
+with col9:
+    y2_2_input = st.text_input("2Y 2", value="")
+
 otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=True)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
@@ -140,26 +167,39 @@ if btn_analiz:
         iy1_v = float(iy1_input.strip().replace(',', '.')) if iy1_input.strip() else 0.0
         iyx_v = float(iyx_input.strip().replace(',', '.')) if iyx_input.strip() else 0.0
         iy2_v = float(iy2_input.strip().replace(',', '.')) if iy2_input.strip() else 0.0
+        y2_1_v = float(y2_1_input.strip().replace(',', '.')) if y2_1_input.strip() else 0.0
+        y2_x_v = float(y2_x_input.strip().replace(',', '.')) if y2_x_input.strip() else 0.0
+        y2_2_v = float(y2_2_input.strip().replace(',', '.')) if y2_2_input.strip() else 0.0
     except ValueError:
         st.error("Lütfen tüm değerleri geçerli sayı olarak girin!")
         st.stop()
 
     df_calc = df_analysis.copy()
-    
-    fark_ms1 = (df_calc['MS1'] - ms1_v)**2 if ms1_v > 0 else 0
-    fark_msx = (df_calc['MSX'] - msx_v)**2 if msx_v > 0 else 0
-    fark_ms2 = (df_calc['MS2'] - ms2_v)**2 if ms2_v > 0 else 0
-    
-    fark_iy1 = (df_calc[iy1_col] - iy1_v)**2 if (iy1_col and iy1_v > 0) else 0
-    fark_iyx = (df_calc[iyx_col] - iyx_v)**2 if (iyx_col and iyx_v > 0) else 0
-    fark_iy2 = (df_calc[iy2_col] - iy2_v)**2 if (iy2_col and iy2_v > 0) else 0
-    
-    df_calc['Mesafe'] = np.sqrt(fark_ms1 + fark_msx + fark_ms2 + fark_iy1 + fark_iyx + fark_iy2)
 
+    # Mesafe Hesaplama (Sadece dolu girilen oranlar hesaba katılır, boşlar atlanır)
+    fark_ms1 = (df_calc['MS1'] - ms1_v) ** 2 if ms1_v > 0 else 0
+    fark_msx = (df_calc['MSX'] - msx_v) ** 2 if msx_v > 0 else 0
+    fark_ms2 = (df_calc['MS2'] - ms2_v) ** 2 if ms2_v > 0 else 0
+
+    fark_iy1 = (df_calc[iy1_col] - iy1_v) ** 2 if (iy1_col and iy1_v > 0) else 0
+    fark_iyx = (df_calc[iyx_col] - iyx_v) ** 2 if (iyx_col and iyx_v > 0) else 0
+    fark_iy2 = (df_calc[iy2_col] - iy2_v) ** 2 if (iy2_col and iy2_v > 0) else 0
+
+    fark_2y1 = (df_calc[y2_1_col] - y2_1_v) ** 2 if (y2_1_col and y2_1_v > 0) else 0
+    fark_2yx = (df_calc[y2_x_col] - y2_x_v) ** 2 if (y2_x_col and y2_x_v > 0) else 0
+    fark_2y2 = (df_calc[y2_2_col] - y2_2_v) ** 2 if (y2_2_col and y2_2_v > 0) else 0
+
+    df_calc['Mesafe'] = np.sqrt(
+        fark_ms1 + fark_msx + fark_ms2 +
+        fark_iy1 + fark_iyx + fark_iy2 +
+        fark_2y1 + fark_2yx + fark_2y2
+    )
+
+    # AKILLI TOLERANS ALGORİTMASI (AI MODU - Sadece dolu kutuları filtreler)
     if otomatik_mod:
         secilen_tol = 0.02
         filtre = pd.Series(True, index=df_calc.index)
-        
+
         for t in [0.01, 0.02, 0.03, 0.05, 0.08, 0.12, 0.20]:
             temp_filtre = pd.Series(True, index=df_calc.index)
             if ms1_v > 0:
@@ -174,19 +214,25 @@ if btn_analiz:
                 temp_filtre &= (df_calc[iyx_col] >= iyx_v - t) & (df_calc[iyx_col] <= iyx_v + t)
             if iy2_col and iy2_v > 0:
                 temp_filtre &= (df_calc[iy2_col] >= iy2_v - t) & (df_calc[iy2_col] <= iy2_v + t)
-            
+            if y2_1_col and y2_1_v > 0:
+                temp_filtre &= (df_calc[y2_1_col] >= y2_1_v - t) & (df_calc[y2_1_col] <= y2_1_v + t)
+            if y2_x_col and y2_x_v > 0:
+                temp_filtre &= (df_calc[y2_x_col] >= y2_x_v - t) & (df_calc[y2_x_col] <= y2_x_v + t)
+            if y2_2_col and y2_2_v > 0:
+                temp_filtre &= (df_calc[y2_2_col] >= y2_2_v - t) & (df_calc[y2_2_col] <= y2_2_v + t)
+
             secilen_tol = t
             if temp_filtre.sum() >= 20 or t == 0.20:
                 filtre = temp_filtre
                 break
-        
+
         df_tolerans = df_calc[filtre].copy()
 
         def skor_ayir_temp(s):
             try:
                 p = str(s).strip().split('-')
                 return int(p[0]), int(p[1])
-            except:
+            except Exception:
                 return 0, 0
 
         if not df_tolerans.empty:
@@ -209,19 +255,21 @@ if btn_analiz:
                 benzerler = df_tolerans.head(20).copy()
                 st.info(f"🤖 AI Modu: ±{secilen_tol} toleransla {toplam_bulunan} maç bulundu (Sürprizler öncelikli). En yakın 20 tanesi listeleniyor.")
         else:
-            st.warning(f"⚠️ Bu aralıkta tam eşleşme bulunamadı, en yakın maçlar listeleniyor.")
+            st.warning("⚠️ Bu aralıkta tam eşleşme bulunamadı, en yakın maçlar listeleniyor.")
             benzerler = df_calc.sort_values('Mesafe').head(20).copy()
-            
+
     else:
         st.info("🎯 Standart Mod: Sıfır tolerans (doğrudan en yakın mesafe) ile en yakın 20 maç listeleniyor.")
         benzerler = df_calc.sort_values('Mesafe').head(20).copy()
+
 
 def skor_ayir(s):
     try:
         p = str(s).strip().split('-')
         return int(p[0]), int(p[1])
-    except:
+    except Exception:
         return 0, 0
+
 
 if 'benzerler' in locals() and not benzerler.empty:
     benzerler[['iy_e', 'iy_d']] = benzerler['İY SKOR'].apply(lambda x: pd.Series(skor_ayir(x)))
@@ -230,12 +278,12 @@ if 'benzerler' in locals() and not benzerler.empty:
     benzerler['iy_toplam'] = benzerler['iy_e'] + benzerler['iy_d']
     benzerler['ms_toplam'] = benzerler['ms_e'] + benzerler['ms_d']
     benzerler['kg_var'] = (benzerler['ms_e'] > 0) & (benzerler['ms_d'] > 0)
-    
+
     iy_kg_var = (benzerler['iy_e'] > 0) & (benzerler['iy_d'] > 0)
     ikinci_yari_e = benzerler['ms_e'] - benzerler['iy_e']
     ikinci_yari_d = benzerler['ms_d'] - benzerler['iy_d']
     ikinci_yari_kg_var = (ikinci_yari_e > 0) & (ikinci_yari_d > 0)
-    
+
     benzerler['her_iki_yari_kg_var'] = iy_kg_var & ikinci_yari_kg_var
 
     def get_ht_ft(row):
@@ -273,10 +321,10 @@ if 'benzerler' in locals() and not benzerler.empty:
 
     # 2. İY VE MS SKOR TRENDLERİ
     st.markdown("<p style='font-size: 11px; font-weight: bold; color: #38bdf8; margin: 0 0 2px 0;'>📊 SKOR TRENDLERİ (ÖZET - STANDART/AI MODU)</p>", unsafe_allow_html=True)
-    
+
     iy_counts = benzerler['İY SKOR'].value_counts().head(6)
     ms_counts = benzerler['MS SKOR'].value_counts().head(6)
-    
+
     iy_lines = [f"🟢 <b>{sk}:</b> {c} (%{int((c/toplam_mac)*100)})" for sk, c in iy_counts.items()]
     ms_lines = [f"🟢 <b>{sk}:</b> {c} (%{int((c/toplam_mac)*100)})" for sk, c in ms_counts.items()]
 
@@ -329,7 +377,7 @@ if 'benzerler' in locals() and not benzerler.empty:
             ht_ft_disp = ht_ft
 
         line_str = f"{mac_adi} | {iy_s} | {ms_s} | {ht_ft_disp}"
-        
+
         renk = "#00FF66"
         font_weight = "normal"
         if is_6plus:
@@ -388,7 +436,7 @@ if btn_takim_ara:
             (df_all['EV SAHİBİ'].astype(str).str.upper().str.contains(takim_b, na=False) & df_all['DEPLASMAN'].astype(str).str.upper().str.contains(takim_a, na=False))
         )
         bulunan_gecmis = df_all[kosul_gecmis]
-        
+
         if not bulunan_gecmis.empty:
             st.success(f"🎉 Aralarındaki toplam {len(bulunan_gecmis)} adet geçmiş maç bulundu (Tüm Sezonlar):")
             for _, m in bulunan_gecmis.iterrows():
@@ -399,28 +447,33 @@ if btn_takim_ara:
                         lig_kolonu_bul = col
                         break
                 lig_bilgi = str(m.get(lig_kolonu_bul, '')) if lig_kolonu_bul else ''
-                
+
                 ev_sahibi = str(m['EV SAHİBİ'])
                 deplasman = str(m['DEPLASMAN'])
-                
+
                 ms1_oran = m.get('MS1', '-')
                 msx_oran = m.get('MSX', '-')
                 ms2_oran = m.get('MS2', '-')
-                if pd.isna(ms1_oran) or str(ms1_oran).strip() == '': ms1_oran = "-"
-                if pd.isna(msx_oran) or str(msx_oran).strip() == '': msx_oran = "-"
-                if pd.isna(ms2_oran) or str(ms2_oran).strip() == '': ms2_oran = "-"
+                if pd.isna(ms1_oran) or str(ms1_oran).strip() == '':
+                    ms1_oran = "-"
+                if pd.isna(msx_oran) or str(msx_oran).strip() == '':
+                    msx_oran = "-"
+                if pd.isna(ms2_oran) or str(ms2_oran).strip() == '':
+                    ms2_oran = "-"
 
                 iy_skor_str = str(m.get('İY SKOR', '-'))
                 ms_skor_str = str(m.get('MS SKOR', '-'))
-                if iy_skor_str == 'nan' or not iy_skor_str.strip(): iy_skor_str = "0-0"
-                if ms_skor_str == 'nan' or not ms_skor_str.strip(): ms_skor_str = "0-0"
+                if iy_skor_str == 'nan' or not iy_skor_str.strip():
+                    iy_skor_str = "0-0"
+                if ms_skor_str == 'nan' or not ms_skor_str.strip():
+                    ms_skor_str = "0-0"
 
                 try:
                     iy_p = iy_skor_str.strip().split('-')
                     ms_p = ms_skor_str.strip().split('-')
                     iy_e, iy_d = int(iy_p[0]), int(iy_p[1])
                     ms_e, ms_d = int(ms_p[0]), int(ms_p[1])
-                except:
+                except Exception:
                     iy_e, iy_d, ms_e, ms_d = 0, 0, 0, 0
 
                 ht_val = '1' if iy_e > iy_d else ('2' if iy_d > iy_e else 'X')
@@ -440,7 +493,7 @@ if btn_takim_ara:
                 elif ht_ft_str == '2/X':
                     is_alev = True
                     alev_etiketleri.append("2/X Sürpriz")
-                
+
                 if ms_toplam_gol >= 6:
                     is_alev = True
                     alev_etiketleri.append(f"{ms_toplam_gol} Gol (6+)")
