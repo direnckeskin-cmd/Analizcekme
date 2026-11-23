@@ -53,6 +53,27 @@ def find_odd_column(columns, patterns):
     return None
 
 
+def find_kg_var_column(columns):
+    """Karşılıklı Gol (KG) bloğundaki VAR sütununu döndürür."""
+    cols_list = list(columns)
+    # Önce açıkça KG/KARSILIKLI + VAR geçen sütunları ara
+    for col in cols_list:
+        norm = re.sub(r'[^A-Z0-9]', '', str(col).upper().replace('İ', 'I'))
+        if ('KARSILIKLI' in norm or 'KG' in norm) and 'VAR' in norm and 'YARI' not in norm and '1Y' not in norm and '2Y' not in norm:
+            return col
+
+    # Pandas header=1 sonrasında KARŞILIKLI GOL'ün altındaki VAR genelde 'VAR' olarak gelir
+    for idx, col in enumerate(cols_list):
+        up = str(col).strip().upper()
+        if up == 'VAR':
+            # İkinci yarı VAR'ı değilse (sonraki sütun YOK ise)
+            next_up = str(cols_list[idx + 1]).strip().upper() if idx + 1 < len(cols_list) else ''
+            if 'YOK' in next_up or idx > 30:
+                return col
+
+    return find_odd_column(cols_list, ['KGVAR', 'KARSILIKLIGOLVAR', 'VAR'])
+
+
 @st.cache_data(show_spinner=False)
 def load_data():
     try:
@@ -90,7 +111,10 @@ y2_1_col = find_odd_column(df_calc_base.columns, ['2Y1', '2IY1', 'IY21'])
 y2_x_col = find_odd_column(df_calc_base.columns, ['2YX', '2IYX', 'IY2X'])
 y2_2_col = find_odd_column(df_calc_base.columns, ['2Y2', '2IY2', 'IY22'])
 
-for c in [iy1_col, iyx_col, iy2_col, y2_1_col, y2_x_col, y2_2_col]:
+# Excel'deki KG VAR sütununu otomatik bulma
+kg_var_col = find_kg_var_column(df_calc_base.columns)
+
+for c in [iy1_col, iyx_col, iy2_col, y2_1_col, y2_x_col, y2_2_col, kg_var_col]:
     if c:
         df_calc_base[c] = pd.to_numeric(df_calc_base[c], errors='coerce')
 
@@ -155,6 +179,9 @@ with col8:
 with col9:
     y2_2_input = st.text_input("2Y 2", value="")
 
+st.markdown("<p style='font-size: 12px; font-weight: bold; color: #38bdf8; margin: 6px 0 4px 0;'>🏆 KARŞILIKLI GOL (KG VAR) ORANI (Boş bırakılabilir)</p>", unsafe_allow_html=True)
+kg_var_input = st.text_input("KG VAR", value="")
+
 otomatik_mod = st.checkbox("🤖 Akıllı Tolerans (AI)", value=True)
 tumunu_goster = st.checkbox("📋 Bulunan tüm maçları listede göster (Sınır olmasın)", value=True)
 btn_analiz = st.button("ANALİZ ET 🚀", use_container_width=True, type="primary")
@@ -170,6 +197,7 @@ if btn_analiz:
         y2_1_v = float(y2_1_input.strip().replace(',', '.')) if y2_1_input.strip() else 0.0
         y2_x_v = float(y2_x_input.strip().replace(',', '.')) if y2_x_input.strip() else 0.0
         y2_2_v = float(y2_2_input.strip().replace(',', '.')) if y2_2_input.strip() else 0.0
+        kg_var_v = float(kg_var_input.strip().replace(',', '.')) if kg_var_input.strip() else 0.0
     except ValueError:
         st.error("Lütfen tüm değerleri geçerli sayı olarak girin!")
         st.stop()
@@ -189,10 +217,13 @@ if btn_analiz:
     fark_2yx = (df_calc[y2_x_col] - y2_x_v) ** 2 if (y2_x_col and y2_x_v > 0) else 0
     fark_2y2 = (df_calc[y2_2_col] - y2_2_v) ** 2 if (y2_2_col and y2_2_v > 0) else 0
 
+    fark_kg_var = (df_calc[kg_var_col] - kg_var_v) ** 2 if (kg_var_col and kg_var_v > 0) else 0
+
     df_calc['Mesafe'] = np.sqrt(
         fark_ms1 + fark_msx + fark_ms2 +
         fark_iy1 + fark_iyx + fark_iy2 +
-        fark_2y1 + fark_2yx + fark_2y2
+        fark_2y1 + fark_2yx + fark_2y2 +
+        fark_kg_var
     )
 
     # AKILLI TOLERANS ALGORİTMASI (AI MODU - Sadece dolu kutuları filtreler)
@@ -220,6 +251,8 @@ if btn_analiz:
                 temp_filtre &= (df_calc[y2_x_col] >= y2_x_v - t) & (df_calc[y2_x_col] <= y2_x_v + t)
             if y2_2_col and y2_2_v > 0:
                 temp_filtre &= (df_calc[y2_2_col] >= y2_2_v - t) & (df_calc[y2_2_col] <= y2_2_v + t)
+            if kg_var_col and kg_var_v > 0:
+                temp_filtre &= (df_calc[kg_var_col] >= kg_var_v - t) & (df_calc[kg_var_col] <= kg_var_v + t)
 
             secilen_tol = t
             if temp_filtre.sum() >= 20 or t == 0.20:
